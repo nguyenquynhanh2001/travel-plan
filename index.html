@@ -251,9 +251,8 @@
     <div class="top">
       <input class="trip-title" id="tripTitle" placeholder="Tên chuyến đi">
       <div class="toolbar">
-        <button class="btn" id="btnPublish" hidden title="Đăng bản hiện tại lên web để người có link xem được">☁ Đăng lên web</button>
-        <button class="btn" id="btnGh"></button>
-        <button class="btn" id="btnExport" title="Tải file sao lưu (gồm cả ảnh)">⬇ Xuất file</button>
+        <button class="btn" id="btnKey" hidden></button>
+        <button class="btn" id="btnExport" title="Tải file sao lưu">⬇ Xuất file</button>
         <button class="btn" id="btnImport" title="Mở file đã xuất">⬆ Nhập file</button>
         <button class="btn" id="btnPrint">🖨 In</button>
         <button class="btn danger" id="btnReset">Xoá hết</button>
@@ -277,22 +276,15 @@
   <button class="close" id="lbClose">✕</button>
 </div>
 
-<dialog class="dlg" id="ghDlg">
-  <form id="ghForm">
-    <h3>Kết nối GitHub để đăng lịch trình</h3>
-    <p>Lịch trình được lưu vào repo <b>travel-plan</b> trên GitHub. Ai có link đều xem được, nhưng chỉ máy đã nhập token mới sửa và đăng được.</p>
-    <ol>
-      <li>Mở trang <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">tạo Fine-grained token ↗</a></li>
-      <li>Repository access: <b>Only select repositories</b> → chọn <b>travel-plan</b></li>
-      <li>Permissions → Repository permissions → <b>Contents: Read and write</b></li>
-      <li>Bấm <b>Generate token</b>, copy và dán vào ô dưới</li>
-    </ol>
-    <input id="ghToken" type="password" placeholder="github_pat_…" autocomplete="off">
-    <div class="dlg-err" id="ghErr"></div>
+<dialog class="dlg" id="keyDlg">
+  <form id="keyForm">
+    <h3>Chỉnh sửa lịch trình</h3>
+    <p>Nhập mã chỉnh sửa (giá trị <b>EDIT_KEY</b> đặt trên server). Máy này sẽ nhớ mã, mọi thay đổi tự lưu lên server và người có link sẽ thấy ngay.</p>
+    <input id="keyInput" type="password" placeholder="Mã chỉnh sửa" autocomplete="current-password">
+    <div class="dlg-err" id="keyErr"></div>
     <div class="dlg-actions">
-      <button type="button" class="btn danger" id="ghDisconnect">Ngắt kết nối máy này</button>
-      <button type="button" class="btn" id="ghCancel">Huỷ</button>
-      <button type="submit" class="btn primary">Kết nối</button>
+      <button type="button" class="btn" id="keyCancel">Huỷ</button>
+      <button type="submit" class="btn primary">Vào chỉnh sửa</button>
     </div>
   </form>
 </dialog>
@@ -302,6 +294,7 @@
 <input type="file" id="fileJson" accept="application/json,.json" hidden>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="config.js"></script>
 <script>
 const MAX_IMG = 4;
 const $ = (s) => document.querySelector(s);
@@ -362,41 +355,40 @@ const ls = {
   set: (k, v) => { try { if (v == null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch {} },
 };
 
-/* ---------- Chế độ: chỉnh sửa (có token) / chỉ xem (người được share) ---------- */
-const REPO = 'nguyenquynhanh2001/travel-plan';
-const BRANCH = 'main';
-const TOKEN_KEY = 'travel-plan:gh-token';
-let token = ls.get(TOKEN_KEY);
+/* ---------- Chế độ ----------
+   Không có API      → chỉ lưu trên máy (như bản offline).
+   Có API, chưa có mã → chỉ xem bản trên server (người được share link).
+   Có API và mã       → chỉnh sửa, tự lưu lên server. */
+const API = (window.TRAVEL_API || (/^(localhost|127\.0\.0\.1)$/.test(location.hostname) ? location.origin : '')).replace(/\/+$/, '');
+const TRIP = new URLSearchParams(location.search).get('trip') || 'main';
+const LOCAL_KEY = `trip:${TRIP}`;
+const EDIT_KEY_STORE = 'travel-plan:edit-key';
+let editKey = API ? ls.get(EDIT_KEY_STORE) : null;
 let viewer = false;
-let publishing = false;
-
-const isDirty = () => (state.updatedAt || 0) > (state.publishedAt || 0);
+const editing = () => !!(API && editKey);
+// version: bản trên server mà máy này đang dựa vào; dirty: có thay đổi chưa lên server.
+const sync = { version: 0, dirty: false, seq: 0, busy: false, again: false, timer: null };
 
 let saveTimer;
 const setStatus = (t) => { $('#status').textContent = t; };
-// Ghi vào máy, không đánh dấu là có thay đổi mới.
+// Ghi bản nháp vào máy (để mất mạng hay tắt trang cũng không mất).
 const persist = () => {
   if (viewer) return;
   clearTimeout(saveTimer);
-  setStatus('Đang lưu…');
+  if (!editing()) setStatus('Đang lưu…');
   saveTimer = setTimeout(async () => {
-    try { await store.set('state', state); setStatus(token && isDirty() ? 'Đã lưu trên máy · chưa đăng' : 'Đã lưu ✓'); }
-    catch (e) { console.error(e); setStatus('⚠ Không lưu được'); }
-  }, 400);
+    try {
+      await store.set(LOCAL_KEY, { state, version: sync.version, dirty: sync.dirty });
+      if (!editing()) setStatus('Đã lưu ✓');
+    } catch (e) { console.error(e); setStatus('⚠ Không lưu được trên máy'); }
+  }, 300);
 };
 const save = () => {
   if (viewer) return;
-  state.updatedAt = Date.now();
+  sync.dirty = true;
+  sync.seq++;
   persist();
-  refreshSync();
-};
-
-const refreshSync = () => {
-  const btn = $('#btnPublish');
-  btn.hidden = viewer || !token;
-  btn.textContent = publishing ? 'Đang đăng…' : '☁ Đăng lên web';
-  btn.classList.toggle('primary', isDirty());
-  if (viewer) setStatus(state.publishedAt ? `Cập nhật ${fmtDate(state.publishedAt)}` : '');
+  if (editing()) schedulePush();
 };
 
 const applyMode = () => {
@@ -405,10 +397,10 @@ const applyMode = () => {
   $('#btnReset').hidden = viewer;
   $('#hint').hidden = viewer;
   $('#tripTitle').readOnly = viewer;
-  const g = $('#btnGh');
-  g.textContent = viewer ? '✎ Chỉnh sửa' : token ? '🔑' : '☁ Kết nối GitHub';
-  g.title = token ? 'Cài đặt kết nối GitHub' : 'Kết nối GitHub để đăng lịch trình cho người khác xem';
-  refreshSync();
+  const k = $('#btnKey');
+  k.hidden = !API;
+  k.textContent = viewer ? '✎ Chỉnh sửa' : '🔑 Thoát sửa';
+  k.title = viewer ? 'Nhập mã để chỉnh sửa' : 'Thoát chế độ chỉnh sửa trên máy này';
 };
 
 const lockInputs = () => document.querySelectorAll('#days input, #days textarea').forEach((el) => {
@@ -434,6 +426,8 @@ const findStop = (id) => {
 };
 const sortDay = (day) => day.stops.sort((a, b) => (a.time || '99:99').localeCompare(b.time || '99:99'));
 const gmapsLink = (p) => `https://www.google.com/maps/search/?api=1&query=${p.lat},${p.lng}`;
+// Ảnh chưa lên server là data URL; đã lên server thì chỉ lưu id.
+const imgSrc = (src) => (src.startsWith('data:') || src.includes('/') ? src : `${API}/api/images/${src}`);
 
 /* ---------- Khoảng cách giữa 2 điểm liền nhau ---------- */
 // Lưu theo cặp id nên đổi thứ tự thì cặp nào liền nhau sẽ hiện đúng số của cặp đó.
@@ -529,7 +523,7 @@ const stopHTML = (s, i) => `
       ${locHTML(s)}
       <textarea class="f-note" rows="2" placeholder="Ghi chú: ăn gì, giá vé, giờ mở cửa…">${esc(s.note)}</textarea>
       <div class="gallery">
-        ${s.images.map((src, k) => `<div class="thumb"><img src="${esc(src)}" data-action="view" data-i="${k}" alt="" loading="lazy"><button class="x" data-action="del-img" data-i="${k}" title="Xoá ảnh">✕</button></div>`).join('')}
+        ${s.images.map((src, k) => `<div class="thumb"><img src="${esc(imgSrc(src))}" data-action="view" data-i="${k}" alt="" loading="lazy"><button class="x" data-action="del-img" data-i="${k}" title="Xoá ảnh">✕</button></div>`).join('')}
         ${s.images.length < MAX_IMG ? `<button class="paste-zone" data-action="pick-img"><span>＋</span>Dán ảnh (Ctrl+V)<br>hoặc bấm để chọn</button>` : ''}
       </div>
     </div>
@@ -590,7 +584,7 @@ let markers = {};
 const popupHTML = (s) => `<div class="pop">
   <b>${esc(s.name || s.place.name)}</b><br>
   <span class="t">${esc(s.time)}${s.time ? ' · ' : ''}${esc(s.place.name)}</span>
-  ${s.images.length ? `<div class="imgs">${s.images.slice(0, 3).map((src) => `<img src="${esc(src)}" alt="">`).join('')}</div>` : ''}
+  ${s.images.length ? `<div class="imgs">${s.images.slice(0, 3).map((src) => `<img src="${esc(imgSrc(src))}" alt="">`).join('')}</div>` : ''}
 </div>`;
 
 const renderMap = () => {
@@ -906,7 +900,7 @@ daysEl.addEventListener('drop', (e) => {
 
 /* ---------- Lightbox ---------- */
 let lb = null;
-const showLb = () => { $('#lbImg').src = findStop(lb.id).stop.images[lb.i]; $('#lb').classList.add('show'); };
+const showLb = () => { $('#lbImg').src = imgSrc(findStop(lb.id).stop.images[lb.i]); $('#lb').classList.add('show'); };
 const moveLb = (step) => {
   const n = findStop(lb.id).stop.images.length;
   lb.i = (lb.i + step + n) % n;
@@ -1020,124 +1014,118 @@ daysEl.addEventListener('click', (e) => {
   }
 });
 
-/* ---------- Đăng lên web: ghi data.json + ảnh vào repo GitHub ---------- */
-const gh = async (path, { method = 'GET', body, auth = token } = {}) => {
-  const r = await fetch(`https://api.github.com/repos/${REPO}${path}`, {
+/* ---------- Đồng bộ với server ---------- */
+const api = async (path, { method = 'GET', body, key = editKey } = {}) => {
+  const r = await fetch(API + path, {
     method,
-    headers: {
-      Accept: 'application/vnd.github+json',
-      Authorization: `Bearer ${auth}`,
-      ...(body && { 'Content-Type': 'application/json' }),
-    },
+    headers: { ...(body && { 'Content-Type': 'application/json' }), ...(key && { 'X-Edit-Key': key }) },
     body: body && JSON.stringify(body),
   });
   const j = await r.json().catch(() => ({}));
-  if (!r.ok) throw Object.assign(new Error(j.message || r.statusText), { status: r.status });
+  if (!r.ok) throw Object.assign(new Error(j.error || r.statusText), { status: r.status });
   return j;
 };
-
-// Ảnh dạng data URL → file images/<hash>.jpg; cùng ảnh thì cùng tên nên không phải tải lại.
-const imageFile = async (src) => {
-  const [head, data] = src.split(',');
-  const ext = (head.match(/image\/(\w+)/)?.[1] || 'jpg').replace('jpeg', 'jpg');
-  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(data));
-  const hex = [...new Uint8Array(digest)].slice(0, 10).map((b) => b.toString(16).padStart(2, '0')).join('');
-  return { path: `images/${hex}.${ext}`, data };
+const tripPath = `/api/trip?id=${encodeURIComponent(TRIP)}`;
+const fetchTrip = async () => {
+  try { return await api(tripPath, { key: null }); }
+  catch (e) { if (e.status === 404) return null; throw e; }
 };
 
-const publish = async () => {
-  if (publishing) return;
-  publishing = true;
-  refreshSync();
-  const at = Date.now();
-  const snap = structuredClone({ ...state, publishedAt: at });
-  try {
-    const head = await gh(`/git/ref/heads/${BRANCH}`);
-    const commit = await gh(`/git/commits/${head.object.sha}`);
-    const tree = await gh(`/git/trees/${commit.tree.sha}?recursive=1`);
-    const existing = new Set(tree.tree.map((t) => t.path));
-    const used = new Set();
-    const entries = [];
-    for (const day of snap.days) {
-      for (const s of day.stops) {
-        for (const [k, src] of s.images.entries()) {
-          if (!src.startsWith('data:')) { used.add(src); continue; }
-          const { path, data } = await imageFile(src);
-          if (!existing.has(path) && !used.has(path)) {
-            const blob = await gh('/git/blobs', { method: 'POST', body: { content: data, encoding: 'base64' } });
-            entries.push({ path, mode: '100644', type: 'blob', sha: blob.sha });
-          }
-          used.add(path);
-          s.images[k] = path;
-        }
+// Đưa ảnh data URL lên server rồi thay bằng id (ảnh đang hiện trên trang vẫn giữ nguyên).
+const uploadImages = async () => {
+  for (const day of state.days) {
+    for (const s of day.stops) {
+      for (const src of s.images.filter((x) => x.startsWith('data:'))) {
+        const [head, data] = src.split(',');
+        const { id } = await api('/api/images', { method: 'POST', body: { mime: head.slice(5).split(';')[0], data } });
+        const at = s.images.indexOf(src);
+        if (at > -1) s.images[at] = id;
       }
     }
-    tree.tree
-      .filter((t) => t.type === 'blob' && t.path.startsWith('images/') && !used.has(t.path))
-      .forEach((t) => entries.push({ path: t.path, mode: '100644', type: 'blob', sha: null }));
-    entries.push({ path: 'data.json', mode: '100644', type: 'blob', content: JSON.stringify(snap) });
-
-    const newTree = await gh('/git/trees', { method: 'POST', body: { base_tree: commit.tree.sha, tree: entries } });
-    const newCommit = await gh('/git/commits', {
-      method: 'POST',
-      body: { message: `Cập nhật lịch trình: ${snap.title || 'chuyến đi'}`, tree: newTree.sha, parents: [head.object.sha] },
-    });
-    await gh(`/git/refs/heads/${BRANCH}`, { method: 'PATCH', body: { sha: newCommit.sha } });
-    state.publishedAt = at;
-    persist();
-    toast('Đã đăng ✓ Người xem link sẽ thấy bản mới sau khoảng 1 phút');
-  } catch (e) {
-    console.error(e);
-    toast(e.status === 401 ? 'Token sai hoặc đã hết hạn — bấm 🔑 để nhập lại' : `Không đăng được: ${e.message}`);
-  } finally {
-    publishing = false;
-    refreshSync();
   }
 };
-$('#btnPublish').addEventListener('click', publish);
 
-const loadRemote = async () => {
-  try {
-    const r = await fetch(`data.json?t=${Date.now()}`, { cache: 'no-store' });
-    if (!r.ok) return null;
-    const j = await r.json();
-    return Array.isArray(j.days) ? j : null;
-  } catch { return null; }
+const schedulePush = (ms = 1200) => {
+  clearTimeout(sync.timer);
+  setStatus('Đang lưu…');
+  sync.timer = setTimeout(push, ms);
 };
 
-const ghDlg = $('#ghDlg');
-$('#btnGh').addEventListener('click', () => {
-  $('#ghToken').value = '';
-  $('#ghErr').textContent = '';
-  $('#ghDisconnect').hidden = !token;
-  ghDlg.showModal();
-});
-$('#ghCancel').addEventListener('click', () => ghDlg.close());
-$('#ghDisconnect').addEventListener('click', () => {
-  if (!confirm('Ngắt kết nối? Máy này sẽ chỉ xem được bản đã đăng.')) return;
-  ls.set(TOKEN_KEY, null);
-  location.reload();
-});
-$('#ghForm').addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const t = $('#ghToken').value.trim();
-  if (!t) return;
-  $('#ghErr').textContent = 'Đang kiểm tra…';
+const push = async (force = false) => {
+  if (sync.busy) { sync.again = true; return; }
+  sync.busy = true;
+  clearTimeout(sync.timer);
+  const seq = sync.seq;
+  let conflict = false;
+  let retry = false;
+  setStatus('Đang lưu lên server…');
   try {
-    const repo = await gh('', { auth: t });
-    if (repo.permissions && !repo.permissions.push) throw new Error('Token chưa có quyền ghi (Contents: Read and write)');
-    token = t;
-    ls.set(TOKEN_KEY, t);
-    viewer = false;
-    applyMode();
-    render();
+    await uploadImages();
+    const r = await api(tripPath, { method: 'PUT', body: { data: state, version: sync.version, force } });
+    sync.version = r.version;
+    if (sync.seq === seq) sync.dirty = false;
     persist();
-    ghDlg.close();
-    toast('Đã kết nối — sửa xong bấm "☁ Đăng lên web"');
+    setStatus(sync.dirty ? 'Đang lưu…' : 'Đã lưu ✓');
+  } catch (e) {
+    console.error(e);
+    if (e.status === 409) conflict = true;
+    else if (e.status === 401) {
+      setStatus('⚠ Sai mã chỉnh sửa · đã lưu trên máy');
+      toast('Mã chỉnh sửa không còn đúng — bấm "🔑 Thoát sửa" rồi nhập lại');
+    } else {
+      retry = true;
+      setStatus('⚠ Chưa lên được server · đã lưu trên máy');
+    }
+  }
+  sync.busy = false;
+  if (conflict) return resolveConflict();
+  if (retry) { sync.timer = setTimeout(push, 15000); return; }
+  if (sync.again || sync.seq !== seq) { sync.again = false; schedulePush(300); }
+};
+
+const resolveConflict = async () => {
+  let remote;
+  try { remote = await fetchTrip(); }
+  catch { setStatus('⚠ Chưa lên được server · đã lưu trên máy'); return; }
+  if (!remote) { sync.version = 0; return push(true); }
+  const takeRemote = confirm('Lịch trình vừa được sửa ở máy khác.\n\n'
+    + 'OK = tải bản mới nhất về (bỏ thay đổi chưa lưu ở máy này)\n'
+    + 'Huỷ = ghi đè lên server bằng bản ở máy này');
+  if (!takeRemote) return push(true);
+  state = { distances: {}, ...remote.data };
+  sync.version = remote.version;
+  sync.dirty = false;
+  persist();
+  render();
+  setStatus('Đã tải bản mới nhất ✓');
+};
+
+const keyDlg = $('#keyDlg');
+$('#btnKey').addEventListener('click', () => {
+  if (!viewer) {
+    const msg = sync.dirty
+      ? 'Còn thay đổi chưa lên server. Chúng vẫn được giữ trên máy này và sẽ lưu lên khi bạn vào chỉnh sửa lại.\nThoát chế độ chỉnh sửa?'
+      : 'Thoát chế độ chỉnh sửa trên máy này?';
+    if (!confirm(msg)) return;
+    ls.set(EDIT_KEY_STORE, null);
+    return location.reload();
+  }
+  $('#keyInput').value = '';
+  $('#keyErr').textContent = '';
+  keyDlg.showModal();
+});
+$('#keyCancel').addEventListener('click', () => keyDlg.close());
+$('#keyForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const key = $('#keyInput').value.trim();
+  if (!key) return;
+  $('#keyErr').textContent = 'Đang kiểm tra…';
+  try {
+    await api('/api/auth', { key });
+    ls.set(EDIT_KEY_STORE, key);
+    location.reload();
   } catch (err) {
-    $('#ghErr').textContent = err.status === 401 ? 'Token không đúng hoặc đã hết hạn'
-      : err.status === 404 ? 'Token này không truy cập được repo travel-plan'
-      : err.message;
+    $('#keyErr').textContent = err.status === 401 ? 'Sai mã chỉnh sửa' : `Không kết nối được server: ${err.message}`;
   }
 });
 
@@ -1167,11 +1155,11 @@ $('#fileJson').addEventListener('change', async (e) => {
     const data = JSON.parse(await file.text());
     if (!Array.isArray(data.days)) throw new Error('bad file');
     if (!confirm('Thay lịch trình hiện tại bằng file này?')) return;
-    state = { ...data, distances: data.distances || {}, publishedAt: state.publishedAt };
+    state = { ...data, distances: data.distances || {} };
     render();
     fitAll();
     save();
-    toast(token ? 'Đã nhập — bấm "☁ Đăng lên web" để người xem thấy' : 'Đã nhập lịch trình');
+    toast('Đã nhập lịch trình');
   } catch { toast('File không hợp lệ'); }
 });
 
@@ -1179,7 +1167,7 @@ $('#btnPrint').addEventListener('click', () => window.print());
 
 $('#btnReset').addEventListener('click', () => {
   if (!confirm('Xoá toàn bộ lịch trình và ảnh? (Nên "Xuất file" để sao lưu trước)')) return;
-  state = { ...defaultState(), publishedAt: state.publishedAt };
+  state = defaultState();
   activeStopId = null;
   render();
   save();
@@ -1189,20 +1177,38 @@ $('#btnReset').addEventListener('click', () => {
 /* ---------- Khởi động ---------- */
 (async () => {
   let local = null;
-  try { local = await store.get('state'); } catch (e) { console.error(e); }
-  if (!local?.days) local = null;
-  const remote = await loadRemote();
+  try {
+    local = await store.get(LOCAL_KEY);
+    // Dữ liệu của bản cũ (lưu dưới khoá 'state') → coi như nháp chưa lên server.
+    if (!local && TRIP === 'main') {
+      const old = await store.get('state');
+      if (old?.days) local = { state: old, version: 0, dirty: true };
+    }
+  } catch (e) { console.error(e); }
+  if (!local?.state?.days) local = null;
 
-  if (token) {
-    // Máy chỉnh sửa: dùng bản trên máy, trừ khi bản trên web mới hơn (đã sửa ở máy khác).
-    state = local || remote;
-    if (local && remote && (remote.publishedAt || 0) > (local.publishedAt || 0)
-      && confirm('Bản trên web mới hơn bản trên máy này (có thể bạn đã sửa ở máy khác).\nTải bản trên web về?')) state = remote;
-  } else if (remote) {
-    viewer = true;
-    state = remote;
+  let remote = null;
+  let remoteFailed = false;
+  if (API) {
+    try { remote = await fetchTrip(); }
+    catch (e) { console.error(e); remoteFailed = true; }
+  }
+
+  if (!API) {
+    state = local?.state;
+  } else if (editKey) {
+    // Có thay đổi chưa lên server (hoặc server chưa có gì) thì dùng bản trên máy và đẩy lên.
+    if (local && (local.dirty || !remote)) {
+      state = local.state;
+      sync.version = local.version || 0;
+      sync.dirty = local.dirty || !remoteFailed;
+    } else if (remote) {
+      state = remote.data;
+      sync.version = remote.version;
+    }
   } else {
-    state = local;
+    viewer = true;
+    state = remote?.data;
   }
   state ||= defaultState();
   state.distances ||= {};
@@ -1210,8 +1216,17 @@ $('#btnReset').addEventListener('click', () => {
   applyMode();
   render();
   fitAll();
-  if (token && state === remote) persist();
-  if (!viewer) navigator.storage?.persist?.();
+
+  if (viewer) {
+    setStatus(remote ? `Cập nhật ${fmtDate(remote.updatedAt)}` : remoteFailed ? '⚠ Không tải được từ server' : 'Chưa có lịch trình');
+    if (remoteFailed) toast('Không tải được lịch trình, kiểm tra mạng rồi tải lại trang');
+    return;
+  }
+  navigator.storage?.persist?.();
+  if (!editing()) return;
+  persist();
+  if (sync.dirty) schedulePush(300);
+  else setStatus(remoteFailed ? '⚠ Đang offline · đã lưu trên máy' : 'Đã lưu ✓');
 })();
 </script>
 </body>

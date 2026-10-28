@@ -1,0 +1,14 @@
+{
+  "name": "travel-plan",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node --env-file=.env scripts/dev-server.js"
+  },
+  "dependencies": {
+    "@neondatabase/serverless": "^1.2.0"
+  },
+  "engines": {
+    "node": "22.x"
+  }
+}
