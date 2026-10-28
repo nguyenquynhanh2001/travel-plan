@@ -50,9 +50,10 @@ export const readBody = async (req) => {
 };
 
 export const requireEditor = (req) => {
-  const key = process.env.EDIT_KEY;
+  // trim: giá trị dán vào dashboard hay dính khoảng trắng/xuống dòng.
+  const key = process.env.EDIT_KEY?.trim();
   if (!key) throw fail(500, 'Server chưa cấu hình EDIT_KEY');
-  const got = req.headers['x-edit-key'];
+  const got = req.headers['x-edit-key']?.trim();
   const digest = (v) => createHash('sha256').update(String(v)).digest();
   if (typeof got !== 'string' || !timingSafeEqual(digest(got), digest(key))) throw fail(401, 'Sai mã chỉnh sửa');
 };
