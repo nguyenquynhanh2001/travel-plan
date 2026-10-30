@@ -1,9 +1,10 @@
 # Lịch trình du lịch
 
-Trang lập lịch trình chuyến đi gồm giờ, địa điểm, bản đồ và ảnh.
+Trang lập lịch trình chuyến đi gồm giờ, địa điểm, bản đồ và ảnh, kèm tab **Chi tiêu** để ghi ai chi khoản gì, bao nhiêu và tính ai cần trả ai.
 
 - Web: https://nguyenquynhanh2001.github.io/travel-plan/
 - Nhiều chuyến đi: thêm `?trip=ten-chuyen-di` vào link (mặc định là `main`).
+- Link mở thẳng tab Chi tiêu: thêm `#chi-tieu` vào cuối link.
 
 ## Kiến trúc
 

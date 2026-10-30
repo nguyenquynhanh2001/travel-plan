@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#1fb5a3"/>
+      <stop offset="1" stop-color="#0b5f59"/>
+    </linearGradient>
+    <linearGradient id="pin" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ff7a52"/>
+      <stop offset="1" stop-color="#e4572e"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="15" fill="url(#bg)"/>
+  <!-- Mặt trời -->
+  <circle cx="17" cy="17" r="5" fill="#ffd166"/>
+  <!-- Đường đi nét đứt -->
+  <path d="M13 51c8 0 9-8 17-8s7 2 8 2" fill="none" stroke="#fff" stroke-width="3.2" stroke-linecap="round" stroke-dasharray="0.01 6.4" opacity=".9"/>
+  <circle cx="13" cy="51" r="3.6" fill="#fff"/>
+  <!-- Ghim -->
+  <path d="M43 9.5c-7.5 0-13.5 5.9-13.5 13.3 0 9.4 13.5 21.7 13.5 21.7s13.5-12.3 13.5-21.7C56.5 15.4 50.5 9.5 43 9.5z" fill="url(#pin)" stroke="#fff" stroke-width="2.6" stroke-linejoin="round"/>
+  <circle cx="43" cy="22.6" r="5" fill="#fff"/>
+</svg>
