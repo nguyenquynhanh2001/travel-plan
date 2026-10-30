@@ -2,7 +2,7 @@
 <html lang="vi">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Lịch trình du lịch</title>
 <meta name="description" content="Lịch trình chuyến đi: thời gian, địa điểm, bản đồ và ảnh.">
 <meta property="og:title" content="Lịch trình du lịch">
@@ -289,7 +289,9 @@
   .dlg input:focus { outline: 2px solid color-mix(in srgb, var(--accent) 35%, transparent); outline-offset: -1px; }
   .dlg-err { color: var(--danger); font-size: 12.5px; min-height: 1.2em; margin-top: 6px; }
   .dlg-actions { display: flex; gap: 6px; justify-content: flex-end; margin-top: 10px; }
-  .dlg-actions .danger { margin-right: auto; }
+  .dlg-actions .danger, .dlg-actions .left { margin-right: auto; }
+  .btn.danger-solid { background: var(--danger); border-color: var(--danger); color: #fff; font-weight: 600; }
+  .btn.danger-solid:hover { background: color-mix(in srgb, var(--danger) 85%, #000); }
 
   .toast {
     position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%) translateY(20px); z-index: 4000;
@@ -306,6 +308,16 @@
     .gallery { grid-template-columns: repeat(3, 1fr); }
     .money { grid-template-columns: minmax(0, 1fr); }
     .m-sum { position: static; }
+    /* Thanh tab cố định ở đáy màn hình */
+    .tabs {
+      position: fixed; left: 0; right: 0; bottom: 0; z-index: 1500; border-radius: 0; gap: 8px;
+      padding: 8px 12px calc(8px + env(safe-area-inset-bottom, 0px));
+      background: var(--panel); border-top: 1px solid var(--line); box-shadow: 0 -4px 16px rgba(0,0,0,.06);
+    }
+    .tabs button { padding: 10px; border-radius: 10px; }
+    .tabs button.on { background: color-mix(in srgb, var(--accent) 12%, var(--panel)); color: var(--accent); box-shadow: none; }
+    .side { padding-bottom: calc(90px + env(safe-area-inset-bottom, 0px)); }
+    .toast { bottom: calc(80px + env(safe-area-inset-bottom, 0px)); }
   }
   @media print {
     .mapwrap, .toolbar, .tabs, .add, .add-person, .paste-zone, .icon-btn, .thumb .x, .search, .results { display: none !important; }
@@ -364,6 +376,20 @@
     <div class="dlg-actions">
       <button type="button" class="btn" id="keyCancel">Huỷ</button>
       <button type="submit" class="btn primary">Vào chỉnh sửa</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog class="dlg" id="resetDlg">
+  <form id="resetForm">
+    <h3>Xoá toàn bộ chuyến đi?</h3>
+    <p>Lịch trình, ảnh và chi tiêu sẽ bị xoá, bản trống được lưu lên server ngay nên ai mở link cũng thấy trống. <b>Không hoàn tác được</b>, nên xuất file sao lưu trước.</p>
+    <input id="resetKey" type="password" placeholder="Nhập lại mã chỉnh sửa để xác nhận" autocomplete="off">
+    <div class="dlg-err" id="resetErr"></div>
+    <div class="dlg-actions">
+      <button type="button" class="btn left" id="resetExport">⬇ Xuất file trước</button>
+      <button type="button" class="btn" id="resetCancel">Huỷ</button>
+      <button type="submit" class="btn danger-solid">Xoá hết</button>
     </div>
   </form>
 </dialog>
@@ -1503,13 +1529,41 @@ $('#fileJson').addEventListener('change', async (e) => {
 
 $('#btnPrint').addEventListener('click', () => window.print());
 
-$('#btnReset').addEventListener('click', () => {
-  if (!confirm('Xoá toàn bộ lịch trình, ảnh và chi tiêu? (Nên "Xuất file" để sao lưu trước)')) return;
+const resetAll = () => {
   state = defaultState();
   activeStopId = null;
   render();
   save();
   map.setView([16.05, 107.5], 5);
+};
+
+// Xoá hết sẽ ghi đè bản trên server nên bắt nhập lại mã chỉnh sửa (kiểm tra với server).
+const resetDlg = $('#resetDlg');
+$('#btnReset').addEventListener('click', () => {
+  if (!editing()) {
+    if (confirm('Xoá toàn bộ lịch trình, ảnh và chi tiêu? (Nên "Xuất file" để sao lưu trước)')) resetAll();
+    return;
+  }
+  $('#resetKey').value = '';
+  $('#resetErr').textContent = '';
+  resetDlg.showModal();
+});
+$('#resetCancel').addEventListener('click', () => resetDlg.close());
+$('#resetExport').addEventListener('click', () => $('#btnExport').click());
+$('#resetForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const key = $('#resetKey').value.trim();
+  if (!key) return $('#resetKey').focus();
+  $('#resetErr').textContent = 'Đang kiểm tra…';
+  try {
+    await api('/api/auth', { key });
+  } catch (err) {
+    $('#resetErr').textContent = err.status === 401 ? 'Sai mã chỉnh sửa' : `Không kết nối được server: ${err.message}`;
+    return;
+  }
+  resetDlg.close();
+  resetAll();
+  toast('Đã xoá hết');
 });
 
 /* ---------- Khởi động ---------- */
