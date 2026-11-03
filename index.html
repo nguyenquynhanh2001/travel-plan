@@ -180,6 +180,7 @@
   .m-sec { margin-bottom: 22px; }
   .m-sec h3 { font-size: 16px; margin: 0 0 10px; display: flex; align-items: baseline; gap: 8px; }
   .m-sec h3 small { color: var(--muted); font-weight: 500; font-size: 12.5px; }
+  .m-sec h3 .btn { margin-left: auto; font-weight: 500; }
   .people { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
   .person { display: inline-flex; align-items: center; background: var(--panel); border: 1px solid var(--line); border-radius: 999px; padding: 2px 2px 2px 12px; }
   .person:focus-within { border-color: var(--accent); }
@@ -320,7 +321,7 @@
     .toast { bottom: calc(80px + env(safe-area-inset-bottom, 0px)); }
   }
   @media print {
-    .mapwrap, .toolbar, .tabs, .add, .add-person, .paste-zone, .icon-btn, .thumb .x, .search, .results { display: none !important; }
+    .mapwrap, .toolbar, .tabs, .add, .add-person, [data-action="export-xlsx"], .paste-zone, .icon-btn, .thumb .x, .search, .results { display: none !important; }
     .m-sum { position: static; }
     .app { display: block; height: auto; }
     .side { overflow: visible; }
@@ -1253,7 +1254,8 @@ const moneyHTML = () => {
         </div>
       </section>
       <section class="m-sec">
-        <h3>Khoản chi <small>${expenses.length} khoản</small></h3>
+        <h3>Khoản chi <small>${expenses.length} khoản</small>
+          ${expenses.length ? '<button class="btn" data-action="export-xlsx" title="Tải file Excel các khoản chi">📊 Xuất Excel</button>' : ''}</h3>
         ${list}
       </section>
     </div>
@@ -1281,6 +1283,84 @@ $('#tabs').addEventListener('click', (e) => {
   if (b && b.dataset.tab !== tab) setTab(b.dataset.tab);
 });
 setTab(tab);
+
+/* ---------- Xuất Excel ---------- */
+// Thư viện ~1MB nên chỉ tải khi bấm nút.
+let xlsxLib;
+const getXLSX = () => xlsxLib ||= new Promise((res, rej) => {
+  const s = document.createElement('script');
+  s.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+  s.onload = () => res(window.XLSX);
+  s.onerror = () => { xlsxLib = null; rej(new Error('Không tải được thư viện Excel')); };
+  document.head.append(s);
+});
+
+const dayName = (id) => {
+  const i = state.days.findIndex((d) => d.id === id);
+  if (i < 0) return 'Chung';
+  const d = state.days[i];
+  return [d.label || `Ngày ${i + 1}`, d.date && d.date.split('-').reverse().join('/')].filter(Boolean).join(' · ');
+};
+
+const exportExcel = async (btn) => {
+  const label = btn.textContent;
+  btn.textContent = 'Đang xuất…';
+  try {
+    const X = await getXLSX();
+    const MONEY = '#,##0';
+    const { people, expenses } = state;
+    const money = (v, f) => ({ t: 'n', v, z: MONEY, ...(f && { f }) });
+
+    // Sheet 1: mỗi khoản một dòng, mỗi người một cột "phần phải chịu".
+    const rows = expenses.map((x, i) => {
+      const split = x.split.filter((id) => people.some((p) => p.id === id));
+      return [i + 1, dayName(x.dayId), x.title, personName(x.payer), money(x.amount || 0),
+        ...people.map((p) => (x.amount && split.includes(p.id) ? money(x.amount / split.length) : null))];
+    });
+    const last = expenses.length + 1;
+    const sumCol = (c) => {
+      const col = X.utils.encode_col(c);
+      const v = rows.reduce((acc, r) => acc + (r[c]?.v || 0), 0);
+      return money(v, `SUM(${col}2:${col}${last})`);
+    };
+    const totalRow = ['', '', 'Tổng', '', ...[4, ...people.map((_, k) => 5 + k)].map(sumCol)];
+    const ws1 = X.utils.aoa_to_sheet([
+      ['STT', 'Ngày', 'Mục chi', 'Ai chi', 'Số tiền', ...people.map((p) => `Phần ${p.name || '?'}`)],
+      ...rows,
+      totalRow,
+    ]);
+    ws1['!cols'] = [{ wch: 5 }, { wch: 18 }, { wch: 30 }, { wch: 16 }, { wch: 14 }, ...people.map(() => ({ wch: 14 }))];
+    ws1['!autofilter'] = { ref: X.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: last - 1, c: 4 + people.length } }) };
+
+    const b = balances();
+    const ws2 = X.utils.aoa_to_sheet([
+      ['Người', 'Đã chi', 'Phần mình', 'Chênh lệch', ''],
+      ...people.map((p) => {
+        const n = Math.round(b[p.id].paid - b[p.id].share);
+        return [p.name || '(chưa đặt tên)', money(b[p.id].paid), money(b[p.id].share), money(n),
+          n > 0 ? 'Được nhận lại' : n < 0 ? 'Cần trả thêm' : 'Đã đủ'];
+      }),
+    ]);
+    ws2['!cols'] = [{ wch: 20 }, { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 14 }];
+
+    const ws3 = X.utils.aoa_to_sheet([
+      ['Người trả', 'Người nhận', 'Số tiền'],
+      ...settle(b).map((t) => [personName(t.from), personName(t.to), money(Math.round(t.amount))]),
+    ]);
+    ws3['!cols'] = [{ wch: 20 }, { wch: 20 }, { wch: 14 }];
+
+    const wb = X.utils.book_new();
+    X.utils.book_append_sheet(wb, ws1, 'Khoản chi');
+    X.utils.book_append_sheet(wb, ws2, 'Từng người');
+    X.utils.book_append_sheet(wb, ws3, 'Thanh toán');
+    X.writeFile(wb, `${(state.title || 'chuyen-di').replace(/[\\/:*?"<>|]/g, '')} - chi tiêu.xlsx`);
+  } catch (e) {
+    console.error(e);
+    toast('Không xuất được Excel, kiểm tra mạng rồi thử lại');
+  } finally {
+    btn.textContent = label;
+  }
+};
 
 const moneyEl = $('#money');
 moneyEl.addEventListener('submit', (e) => {
@@ -1327,6 +1407,7 @@ moneyEl.addEventListener('change', (e) => {
 
 moneyEl.addEventListener('click', (e) => {
   const btn = e.target.closest('[data-action]');
+  if (btn?.dataset.action === 'export-xlsx') return exportExcel(btn);
   if (!btn || viewer) return;
   const x = findExpense(btn.closest('.exp')?.dataset.eid);
   const pid = btn.dataset.pid || btn.closest('.person')?.dataset.pid;
