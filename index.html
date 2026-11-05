@@ -34,8 +34,23 @@
   button { cursor: pointer; }
   :disabled { opacity: 1; color: inherit; -webkit-text-fill-color: currentColor; }
 
-  .app { display: grid; grid-template-columns: minmax(380px, 540px) 1fr; height: 100vh; }
-  .side { overflow-y: auto; padding: 20px 20px 80px; border-right: 1px solid var(--line); }
+  .app { display: grid; grid-template-columns: var(--side-w, 520px) 8px 1fr; height: 100vh; }
+  .side { overflow-y: auto; padding: 20px 20px 80px; }
+
+  /* Thanh kéo đổi độ rộng giữa lịch trình và bản đồ */
+  .resizer { position: relative; cursor: col-resize; touch-action: none; background: var(--bg); }
+  .resizer::before {
+    content: ""; position: absolute; top: 0; bottom: 0; left: 3px; width: 1px; background: var(--line);
+    transition: background .15s, width .15s, left .15s;
+  }
+  .resizer::after {
+    content: ""; position: absolute; top: 50%; left: 1px; width: 6px; height: 40px; margin-top: -20px;
+    border-radius: 3px; background: var(--line); transition: background .15s;
+  }
+  .resizer:hover::before, .resizing .resizer::before { left: 2px; width: 3px; background: var(--accent); }
+  .resizer:hover::after, .resizing .resizer::after { background: var(--accent); }
+  .resizing, .resizing * { cursor: col-resize !important; user-select: none; }
+  .resizing #map { pointer-events: none; }
   .mapwrap { position: relative; }
   #map { position: absolute; inset: 0; }
 
@@ -172,7 +187,7 @@
   .tabs button.on { background: var(--panel); color: var(--ink); box-shadow: 0 1px 3px rgba(0,0,0,.12); }
   body:not(.tab-money) #money, .tab-money #days, .tab-money #hint, .tab-money .mapwrap { display: none; }
   .tab-money .app { grid-template-columns: minmax(0, 1fr); }
-  .tab-money .side { border-right: 0; }
+  .tab-money .resizer, .tab-money #places { display: none; }
   .tab-money .side > * { max-width: 1040px; margin-inline: auto; }
 
   /* Chi tiêu */
@@ -226,6 +241,63 @@
   .transfers li { background: var(--soft); border-radius: 8px; padding: 8px 10px; display: flex; gap: 6px; align-items: baseline; flex-wrap: wrap; }
   .transfers .amt { margin-left: auto; }
 
+  /* Danh sách địa điểm (nổi trên bản đồ; mobile thì nằm trong cột lịch trình) */
+  .places {
+    --c: var(--accent); position: absolute; top: 12px; left: 12px; z-index: 1000;
+    width: min(310px, calc(100% - 24px)); max-height: calc(100% - 24px); display: flex; flex-direction: column;
+    background: var(--panel); border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,.15);
+  }
+  .places[hidden] { display: none; }
+  .pl-head {
+    border: 0; background: transparent; padding: 9px 12px; display: flex; align-items: center; gap: 8px;
+    font-weight: 700; font-size: 14px; text-align: left; flex: none;
+  }
+  .pl-head small { color: var(--muted); font-weight: 500; }
+  .pl-caret { margin-left: auto; color: var(--muted); transition: transform .15s; }
+  .places.open .pl-caret { transform: rotate(180deg); }
+  .pl-body { display: none; flex-direction: column; gap: 8px; padding: 0 12px 12px; min-height: 0; }
+  .places.open .pl-body { display: flex; }
+  .pl-filter { display: flex; flex-wrap: wrap; gap: 4px; }
+  .pl-filter small { opacity: .7; }
+  .pl-form { display: flex; gap: 6px; margin: 0; }
+  .pl-form input { flex: 1; min-width: 0; border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; }
+  .pl-form input:focus { outline: 2px solid color-mix(in srgb, var(--accent) 35%, transparent); outline-offset: -1px; }
+  .pl-list { display: flex; flex-direction: column; gap: 6px; overflow-y: auto; min-height: 0; margin: 0 -4px; padding: 0 4px 2px; }
+  .pl-item {
+    --c: var(--accent); display: flex; flex-wrap: wrap; align-items: center; gap: 6px;
+    background: var(--soft); border-radius: 10px; padding: 6px 4px 6px 6px;
+  }
+  .pl-item.dragging { opacity: .4; }
+  .pl-ic { border: 0; background: var(--panel); width: 30px; height: 30px; border-radius: 8px; font-size: 16px; flex: none; padding: 0; }
+  .pl-ic:hover { box-shadow: 0 0 0 2px var(--accent); }
+  .pl-main { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; }
+  .pl-name { width: 100%; border: 0; background: transparent; font-weight: 600; padding: 1px 0; border-bottom: 1px solid transparent; }
+  .pl-name:focus { outline: none; border-bottom-color: var(--line); }
+  .pl-sub { font-size: 11.5px; color: var(--muted); max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  button.pl-sub { color: var(--accent); }
+  .pl-used { font-size: 11.5px; color: var(--ok); font-weight: 600; }
+  .pl-item .icon-btn { width: 26px; height: 26px; }
+  .pl-item .pl-addbtn:hover { color: var(--accent); }
+  .pl-extra { display: flex; flex-direction: column; gap: 2px; width: 100%; padding-left: 42px; padding-right: 4px; }
+  .pl-price, .pl-note {
+    width: 100%; border: 0; border-bottom: 1px solid transparent; background: transparent;
+    font-size: 12.5px; padding: 2px 0; resize: none; overflow: hidden; line-height: 1.4;
+  }
+  .pl-price { font-weight: 600; color: var(--danger); }
+  .pl-price:focus, .pl-note:focus { outline: none; border-bottom-color: var(--line); }
+  .pl-price:hover, .pl-note:hover { border-bottom-color: var(--line); }
+  .pop .meta { margin-top: 4px; font-size: 12px; white-space: pre-line; }
+  .pop .meta b { font-size: 12px; color: var(--danger); }
+  .pl-days { display: flex; flex-wrap: wrap; gap: 4px; width: 100%; padding-left: 42px; }
+  .pl-mk {
+    width: 28px; height: 28px; border-radius: 50%; background: #fff; border: 2px solid var(--accent);
+    display: grid; place-items: center; font-size: 14px; box-shadow: 0 1px 5px rgba(0,0,0,.3);
+  }
+  .pop-add { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px; }
+  .pop-add button { border: 1px solid var(--accent); background: transparent; color: var(--accent); border-radius: 999px; padding: 3px 9px; font-size: 12px; font-weight: 600; }
+  .pop-add button:hover { background: var(--accent); color: #fff; }
+  @media (hover: none) { .pl-item .handle { display: none; } }
+
   /* Chế độ xem (người được share link) */
   .viewer .handle, .viewer .add, .viewer .paste-zone, .viewer .icon-btn, .viewer .thumb .x,
   .viewer .search, .viewer .results, .viewer [data-action="clear-place"], .viewer [data-action="calc-km"],
@@ -234,6 +306,10 @@
   .viewer .f-note { resize: none; background: var(--soft); border-color: transparent; outline: none; }
   .viewer .f-name, .viewer .day-label, .viewer .f-km, .viewer .f-title, .viewer .f-amount, .viewer .f-person { outline: none; border-bottom-color: transparent; cursor: default; }
   .viewer .person { padding-right: 12px; }
+  .viewer .pl-form, .viewer #plResults { display: none !important; }
+  .viewer .pl-ic { pointer-events: none; }
+  .viewer .pl-price:placeholder-shown, .viewer .pl-note:placeholder-shown { display: none; }
+  .viewer .pl-price:hover, .viewer .pl-note:hover { border-bottom-color: transparent; }
   .viewer .exp select { appearance: none; border-color: transparent; background: transparent; padding-left: 0; font-weight: 600; }
 
   /* Map overlay */
@@ -244,7 +320,7 @@
   .map-ctrl button { border: 0; background: transparent; border-radius: 7px; padding: 6px 10px; font-size: 13px; }
   .map-ctrl button.on { background: var(--ink); color: var(--panel); }
   .pick-banner {
-    position: absolute; left: 50%; top: 12px; transform: translateX(-50%); z-index: 1000;
+    position: absolute; left: 50%; top: 12px; transform: translateX(-50%); z-index: 1100;
     background: var(--ink); color: var(--panel); border-radius: 10px; padding: 8px 12px; font-size: 13px;
     display: none; align-items: center; gap: 10px; box-shadow: 0 2px 10px rgba(0,0,0,.25);
   }
@@ -302,9 +378,12 @@
   .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
   @media (max-width: 860px) {
-    .app { grid-template-columns: 1fr; height: auto; }
+    .app { grid-template-columns: minmax(0, 1fr); height: auto; }
+    .resizer { display: none; }
     .mapwrap { height: 42vh; position: sticky; top: 0; z-index: 5; order: -1; }
-    .side { overflow: visible; border-right: 0; padding: 16px 16px 60px; }
+    .side { overflow: visible; padding: 16px 16px 60px; }
+    .places { position: static; width: auto; max-height: none; margin-bottom: 18px; box-shadow: none; border: 1px solid var(--line); }
+    .pl-list { max-height: 50vh; }
     .day-head { top: 42vh; }
     .gallery { grid-template-columns: repeat(3, 1fr); }
     .money { grid-template-columns: minmax(0, 1fr); }
@@ -321,7 +400,7 @@
     .toast { bottom: calc(80px + env(safe-area-inset-bottom, 0px)); }
   }
   @media print {
-    .mapwrap, .toolbar, .tabs, .add, .add-person, [data-action="export-xlsx"], .paste-zone, .icon-btn, .thumb .x, .search, .results { display: none !important; }
+    .mapwrap, .resizer, #places, .toolbar, .tabs, .add, .add-person, [data-action="export-xlsx"], .paste-zone, .icon-btn, .thumb .x, .search, .results { display: none !important; }
     .m-sum { position: static; }
     .app { display: block; height: auto; }
     .side { overflow: visible; }
@@ -349,13 +428,26 @@
         <button data-tab="plan">🗺 Lịch trình</button>
         <button data-tab="money">💰 Chi tiêu</button>
       </div>
-      <p class="hint" id="hint">Bấm vào một điểm rồi <b>Ctrl+V</b> để dán ảnh (hoặc kéo thả ảnh vào). Kéo <b>⋮⋮</b> để đổi thứ tự điểm, kể cả sang ngày khác. Ô tìm vị trí nhận tên địa điểm, toạ độ, hoặc link Google Maps.</p>
+      <p class="hint" id="hint">Bấm vào một điểm rồi <b>Ctrl+V</b> để dán ảnh (hoặc kéo thả ảnh vào). Kéo <b>⋮⋮</b> để đổi thứ tự điểm, kể cả sang ngày khác, hoặc kéo từ danh sách <b>📌 Địa điểm</b> vào lịch trình. Ô tìm vị trí nhận tên địa điểm, toạ độ, hoặc link Google Maps.</p>
     </div>
     <div id="days"></div>
     <div class="money" id="money"></div>
   </aside>
+  <div class="resizer" id="resizer" title="Kéo để đổi độ rộng · bấm đúp để về mặc định"></div>
   <main class="mapwrap">
     <div id="map"></div>
+    <section class="places" id="places">
+      <button class="pl-head" data-action="pl-toggle">📌 Địa điểm <small id="plCount"></small><span class="pl-caret">▾</span></button>
+      <div class="pl-body">
+        <div class="pl-filter" id="plFilter"></div>
+        <form class="pl-form" id="plForm">
+          <input id="plInput" autocomplete="off">
+          <button class="sbtn">Thêm</button>
+        </form>
+        <div class="results" id="plResults"></div>
+        <div class="pl-list" id="plList"></div>
+      </div>
+    </section>
     <div class="map-ctrl" id="mapCtrl"></div>
     <div class="pick-banner" id="pickBanner"><span id="pickText"></span><button id="pickCancel">Huỷ</button></div>
   </main>
@@ -420,9 +512,12 @@ const defaultState = () => ({
   distances: {},
   people: [],
   expenses: [],
+  places: [],
 });
 // Dữ liệu cũ (trước khi có khoảng cách / chi tiêu) thiếu các trường này.
-const normalize = (s) => ({ ...s, distances: s.distances || {}, people: s.people || [], expenses: s.expenses || [] });
+const normalize = (s) => ({
+  ...s, distances: s.distances || {}, people: s.people || [], expenses: s.expenses || [], places: s.places || [],
+});
 
 let state;
 let activeStopId = null;
@@ -515,7 +610,7 @@ const applyMode = () => {
   k.title = viewer ? 'Nhập mã để chỉnh sửa' : 'Thoát chế độ chỉnh sửa trên máy này';
 };
 
-const lockInputs = () => document.querySelectorAll('#days input, #days textarea, #money input, #money select').forEach((el) => {
+const lockInputs = () => document.querySelectorAll('#days input, #days textarea, #money input, #money select, #places input, #places textarea').forEach((el) => {
   if (el.type === 'time' || el.type === 'date') { el.disabled = true; el.hidden = !el.value; }
   else if (el.tagName === 'SELECT') el.disabled = true;
   else el.readOnly = true;
@@ -664,6 +759,7 @@ const render = () => {
   $('#tripTitle').value = state.title;
   $('#days').innerHTML = state.days.map(dayHTML).join('');
   renderMoney();
+  renderPlaces();
   if (viewer) lockInputs();
   renderMapCtrl();
   renderMap();
@@ -676,7 +772,9 @@ const setActive = (id) => {
 };
 
 /* ---------- Bản đồ ---------- */
-const map = L.map('map').setView([16.05, 107.5], 5);
+// Góc trên bên trái để cho danh sách địa điểm nên đưa nút zoom xuống dưới.
+const map = L.map('map', { zoomControl: false }).setView([16.05, 107.5], 5);
+L.control.zoom({ position: 'bottomleft' }).addTo(map);
 const google = (lyrs) => L.tileLayer(`https://mt{s}.google.com/vt/lyrs=${lyrs}&hl=vi&x={x}&y={y}&z={z}`, {
   attribution: '&copy; Google', subdomains: '0123', maxZoom: 20,
 });
@@ -694,6 +792,7 @@ baseLayers['Google Maps'].addTo(map);
 L.control.layers(baseLayers, null, { position: 'bottomright' }).addTo(map);
 const layer = L.layerGroup().addTo(map);
 let markers = {};
+let placeMarkers = {};
 
 const popupHTML = (s) => `<div class="pop">
   <b>${esc(s.name || s.place.name)}</b><br>
@@ -720,6 +819,19 @@ const renderMap = () => {
       markers[s.id] = m;
     });
     if (pts.length > 1) L.polyline(pts, { color, weight: 3, opacity: 0.75, dashArray: '6 8' }).addTo(layer);
+  });
+
+  // Địa điểm trong danh sách chưa đưa vào lịch trình (chỉ hiện khi đang mở danh sách).
+  placeMarkers = {};
+  if (!placesOpen) return;
+  const used = usedPlaces();
+  visiblePlaces().forEach((p) => {
+    if (!p.place || used.has(p.id)) return;
+    const m = L.marker([p.place.lat, p.place.lng], {
+      icon: L.divIcon({ className: '', html: `<div class="pl-mk">${typeOf(p).icon}</div>`, iconSize: [28, 28], iconAnchor: [14, 14], popupAnchor: [0, -14] }),
+    }).bindPopup(placePopupHTML(p));
+    m.addTo(layer);
+    placeMarkers[p.id] = m;
   });
 };
 
@@ -920,6 +1032,7 @@ $('#fileImg').addEventListener('change', (e) => {
 /* ---------- Kéo thả sắp xếp điểm ---------- */
 const DRAG_TYPE = 'application/x-stop';
 let draggingId = null;
+let placeDragId = null; // đang kéo một địa điểm từ danh sách vào lịch trình
 
 const clearDropMarks = () => document.querySelectorAll('.drop-before, .drop-after, .drop-end, .stop.drag')
   .forEach((el) => el.classList.remove('drop-before', 'drop-after', 'drop-end', 'drag'));
@@ -979,11 +1092,11 @@ daysEl.addEventListener('dragend', () => {
 });
 daysEl.addEventListener('dragover', (e) => {
   if (viewer) return;
-  if (draggingId) {
+  if (draggingId || placeDragId) {
     const t = getDropTarget(e);
     if (!t) return;
     e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
+    e.dataTransfer.dropEffect = placeDragId ? 'copy' : 'move';
     markDrop(t);
     return;
   }
@@ -995,7 +1108,7 @@ daysEl.addEventListener('dragover', (e) => {
 });
 daysEl.addEventListener('dragleave', (e) => {
   if (!daysEl.contains(e.relatedTarget)) clearDropMarks();
-  else if (!draggingId) e.target.closest('.stop')?.classList.remove('drag');
+  else if (!draggingId && !placeDragId) e.target.closest('.stop')?.classList.remove('drag');
 });
 daysEl.addEventListener('drop', (e) => {
   if (viewer) return;
@@ -1006,12 +1119,298 @@ daysEl.addEventListener('drop', (e) => {
     if (t) moveStop(draggingId, t.dayEl.dataset.day, t.beforeEl?.dataset.id);
     return;
   }
+  if (placeDragId) {
+    e.preventDefault();
+    const t = getDropTarget(e);
+    clearDropMarks();
+    if (t) insertPlace(placeDragId, t.dayEl.dataset.day, t.beforeEl?.dataset.id);
+    return;
+  }
   const st = e.target.closest('.stop');
   if (!st) return;
   e.preventDefault();
   st.classList.remove('drag');
   setActive(st.dataset.id);
   addImages(st.dataset.id, [...e.dataTransfer.files]);
+});
+
+/* ---------- Danh sách địa điểm ---------- */
+const TYPES = {
+  checkin: { icon: '📸', label: 'Check-in' },
+  food: { icon: '🍜', label: 'Ăn uống' },
+  stay: { icon: '🏠', label: 'Homestay' },
+};
+const typeOf = (p) => TYPES[p.type] || TYPES.checkin;
+const PLACES_OPEN = 'travel-plan:places-open';
+let placesOpen = ls.get(PLACES_OPEN) === '1';
+let plFilter = 'all';
+let plAdding = null; // địa điểm đang mở hàng nút "→ Ngày…"
+let plResults = [];
+const placesEl = $('#places');
+
+const dayLabel = (d) => d.label || `Ngày ${state.days.indexOf(d) + 1}`;
+const visiblePlaces = () => state.places.filter((p) => plFilter === 'all' || p.type === plFilter);
+// id địa điểm → các ngày đã dùng nó trong lịch trình.
+const usedPlaces = () => {
+  const used = new Map();
+  state.days.forEach((d) => d.stops.forEach((s) => {
+    if (!s.placeId) return;
+    const list = used.get(s.placeId) || [];
+    if (!list.includes(dayLabel(d))) list.push(dayLabel(d));
+    used.set(s.placeId, list);
+  }));
+  return used;
+};
+
+const placePopupHTML = (p) => `<div class="pop">
+  <b>${typeOf(p).icon} ${esc(p.name || p.place.name)}</b><br>
+  <span class="t">${typeOf(p).label} · ${esc(p.place.name)}</span>
+  ${p.price || p.note ? `<div class="meta">${p.price ? `<b>💰 ${esc(p.price)}</b>${p.note ? '<br>' : ''}` : ''}${esc(p.note)}</div>` : ''}
+  ${viewer ? '' : `<div class="pop-add">${state.days.map((d) => `<button data-pl-to="${p.id}" data-day="${d.id}">+ ${esc(dayLabel(d))}</button>`).join('')}</div>`}
+</div>`;
+
+const placeItemHTML = (p, days) => `<div class="pl-item" data-plid="${p.id}">
+    <span class="handle" draggable="true" title="Kéo vào lịch trình">⋮⋮</span>
+    <button class="pl-ic" data-action="pl-type" title="${typeOf(p).label} · bấm để đổi loại">${typeOf(p).icon}</button>
+    <div class="pl-main">
+      <input class="pl-name" value="${esc(p.name)}" placeholder="Tên địa điểm">
+      ${p.place
+        ? `<button class="link pl-sub" data-action="pl-focus" title="Xem trên bản đồ">📍 ${esc(p.place.name)}</button>`
+        : '<span class="pl-sub">Chưa có vị trí</span>'}
+      ${days ? `<span class="pl-used">✓ ${esc(days.join(', '))}</span>` : ''}
+    </div>
+    <button class="icon-btn pl-addbtn" data-action="pl-add" title="Thêm vào ngày…">＋</button>
+    <button class="icon-btn" data-action="pl-del" title="Xoá khỏi danh sách">✕</button>
+    <div class="pl-extra">
+      <input class="pl-price" value="${esc(p.price)}" placeholder="💰 Giá (vd: 350k/đêm, 50k/người)">
+      <textarea class="pl-note" rows="${Math.max(1, (p.note || '').split('\n').length)}" placeholder="📝 Ghi chú">${esc(p.note)}</textarea>
+    </div>
+    ${plAdding === p.id ? `<div class="pl-days">${state.days.map((d) => `<button class="chip" data-action="pl-to-day" data-day="${d.id}">→ ${esc(dayLabel(d))}</button>`).join('')}</div>` : ''}
+  </div>`;
+
+const renderPlaces = () => {
+  placesEl.hidden = viewer && !state.places.length;
+  placesEl.classList.toggle('open', placesOpen);
+  $('#plCount').textContent = state.places.length || '';
+  const count = (k) => state.places.filter((p) => k === 'all' || p.type === k).length;
+  $('#plFilter').innerHTML = [['all', 'Tất cả'], ...Object.entries(TYPES).map(([k, t]) => [k, `${t.icon} ${t.label}`])]
+    .map(([k, label]) => `<button class="chip ${plFilter === k ? 'on' : ''}" data-action="pl-filter" data-f="${k}">${label} <small>${count(k)}</small></button>`).join('');
+  $('#plInput').placeholder = `Thêm ${{ food: 'quán ăn', stay: 'homestay' }[plFilter] || 'địa điểm'}: tên, link Google Maps…`;
+  const used = usedPlaces();
+  const list = visiblePlaces();
+  $('#plList').innerHTML = list.length
+    ? list.map((p) => placeItemHTML(p, used.get(p.id))).join('')
+    : `<div class="res-msg">${state.places.length ? 'Không có địa điểm loại này.' : 'Lưu sẵn các chỗ muốn đi, quán muốn ăn ở đây rồi kéo ⋮⋮ thả vào lịch trình.'}</div>`;
+  if (viewer) lockInputs();
+};
+
+const addPlace = (name, place) => {
+  state.places.unshift({ id: uid(), type: plFilter === 'all' ? 'checkin' : plFilter, name, place, price: '', note: '' });
+  $('#plInput').value = '';
+  $('#plResults').innerHTML = '';
+  renderPlaces();
+  renderMap();
+  save();
+};
+
+const searchPlace = async () => {
+  const q = $('#plInput').value.trim();
+  const box = $('#plResults');
+  if (!q) return;
+  if (isShortGmaps(q)) {
+    box.innerHTML = '<div class="res-msg">Link rút gọn <b>maps.app.goo.gl</b> không chứa toạ độ. Mở link trên máy tính rồi copy <b>link đầy đủ trên thanh địa chỉ</b>, hoặc copy toạ độ (dạng <i>10.77, 106.69</i>).</div>';
+    return;
+  }
+  const g = parseGmaps(q);
+  if (g?.lat != null) {
+    box.innerHTML = '<div class="res-msg">Đang lấy tên địa điểm…</div>';
+    const name = g.name || await reverseName(g.lat, g.lng) || `${g.lat.toFixed(5)}, ${g.lng.toFixed(5)}`;
+    return addPlace(name, { lat: g.lat, lng: g.lng, name });
+  }
+  const query = g?.name || q;
+  const plain = `<button class="res" data-action="pl-plain" data-name="${esc(query)}"><b>＋ Thêm “${esc(query)}”</b><small>Chưa gắn vị trí, gắn sau ở lịch trình</small></button>`;
+  box.innerHTML = '<div class="res-msg">Đang tìm…</div>';
+  try {
+    const r = await fetch(`https://nominatim.openstreetmap.org/search?format=jsonv2&limit=5&accept-language=vi&q=${encodeURIComponent(query)}`);
+    plResults = await r.json();
+    box.innerHTML = plResults.map((x, i) => `<button class="res" data-action="pl-choose" data-i="${i}"><b>${esc(x.name || shortName(x.display_name))}</b><small>${esc(x.display_name)}</small></button>`).join('') + plain;
+  } catch (e) {
+    console.error(e);
+    box.innerHTML = '<div class="res-msg">Lỗi kết nối khi tìm kiếm.</div>' + plain;
+  }
+};
+
+// Giờ cho điểm mới chèn giữa a và b ("HH:MM" hoặc rỗng).
+const toMin = (t) => (t ? Number(t.slice(0, 2)) * 60 + Number(t.slice(3, 5)) : null);
+const toTime = (m) => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
+const timeBetween = (a, b) => {
+  const x = toMin(a);
+  const y = toMin(b);
+  if (x != null && y != null) return toTime(Math.round((x + y) / 10) * 5);
+  if (x != null) return toTime(Math.min(x + 120, 23 * 60 + 59));
+  if (y != null) return toTime(Math.max(y - 60, 0));
+  return '08:00';
+};
+
+// Chép địa điểm thành một điểm mới trong ngày (trước beforeId, không có thì cuối ngày).
+const insertPlace = (plid, dayId, beforeId) => {
+  const p = state.places.find((x) => x.id === plid);
+  const day = state.days.find((d) => d.id === dayId);
+  if (!p || !day) return;
+  const idx = beforeId ? day.stops.findIndex((s) => s.id === beforeId) : -1;
+  const at = idx < 0 ? day.stops.length : idx;
+  const s = {
+    ...newStop(timeBetween(day.stops[at - 1]?.time, day.stops[at]?.time)),
+    name: p.name, place: p.place && { ...p.place }, placeId: p.id,
+    note: [p.price && `Giá: ${p.price}`, p.note].filter(Boolean).join('\n'),
+  };
+  day.stops.splice(at, 0, s);
+  plAdding = null;
+  activeStopId = s.id;
+  render();
+  save();
+  scrollToStop(s.id);
+  toast(`Đã thêm "${p.name}" vào ${dayLabel(day)}`);
+};
+
+const focusPlace = (id) => {
+  const s = state.days.flatMap((d) => d.stops).find((x) => x.placeId === id && x.place);
+  if (s) { scrollToStop(s.id); return focusStopOnMap(s.id); }
+  const m = placeMarkers[id];
+  if (!m) return;
+  map.flyTo(m.getLatLng(), Math.max(map.getZoom(), 15), { duration: 0.6 });
+  setTimeout(() => m.openPopup(), 650);
+};
+
+$('#plForm').addEventListener('submit', (e) => {
+  e.preventDefault();
+  if (!viewer) searchPlace();
+});
+
+placesEl.addEventListener('click', (e) => {
+  const btn = e.target.closest('[data-action]');
+  if (!btn) return;
+  const id = btn.closest('.pl-item')?.dataset.plid;
+  const p = state.places.find((x) => x.id === id);
+  switch (btn.dataset.action) {
+    case 'pl-toggle':
+      placesOpen = !placesOpen;
+      ls.set(PLACES_OPEN, placesOpen ? '1' : null);
+      renderPlaces();
+      renderMap();
+      return;
+    case 'pl-filter': plFilter = btn.dataset.f; renderPlaces(); renderMap(); return;
+    case 'pl-focus': focusPlace(id); return;
+  }
+  if (viewer) return;
+  switch (btn.dataset.action) {
+    case 'pl-type': {
+      const keys = Object.keys(TYPES);
+      p.type = keys[(keys.indexOf(p.type) + 1) % keys.length];
+      break;
+    }
+    case 'pl-add': plAdding = plAdding === id ? null : id; renderPlaces(); return;
+    case 'pl-to-day': insertPlace(id, btn.dataset.day); return;
+    case 'pl-del': state.places = state.places.filter((x) => x !== p); break;
+    case 'pl-choose': {
+      const r = plResults[Number(btn.dataset.i)];
+      if (r) addPlace(r.name || shortName(r.display_name), { lat: Number(r.lat), lng: Number(r.lon), name: shortName(r.display_name) });
+      return;
+    }
+    case 'pl-plain': addPlace(btn.dataset.name, null); return;
+    default: return;
+  }
+  renderPlaces();
+  renderMap();
+  save();
+});
+
+placesEl.addEventListener('input', (e) => {
+  const t = e.target;
+  const field = ['name', 'price', 'note'].find((k) => t.classList.contains(`pl-${k}`));
+  if (viewer || !field) return;
+  const p = state.places.find((x) => x.id === t.closest('.pl-item').dataset.plid);
+  p[field] = t.value;
+  if (field === 'note') { t.style.height = 'auto'; t.style.height = `${t.scrollHeight}px`; }
+  placeMarkers[p.id]?.setPopupContent(placePopupHTML(p));
+  save();
+});
+
+placesEl.addEventListener('dragstart', (e) => {
+  const item = e.target.closest?.('.handle')?.closest('.pl-item');
+  if (!item || viewer) return;
+  placeDragId = item.dataset.plid;
+  e.dataTransfer.effectAllowed = 'copy';
+  e.dataTransfer.setData('application/x-place', placeDragId);
+  e.dataTransfer.setDragImage(item, 20, 20);
+  requestAnimationFrame(() => item.classList.add('dragging'));
+});
+placesEl.addEventListener('dragend', () => {
+  placesEl.querySelector('.pl-item.dragging')?.classList.remove('dragging');
+  placeDragId = null;
+  clearDropMarks();
+});
+
+// Nút "+ Ngày…" trong popup trên bản đồ. Leaflet chặn click lan ra ngoài popup nên bắt ở pha capture.
+$('#map').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-pl-to]');
+  if (!b || viewer) return;
+  map.closePopup();
+  insertPlace(b.dataset.plTo, b.dataset.day);
+}, true);
+
+// Mobile: bản đồ nhỏ nên đưa danh sách vào cột lịch trình, ngay trên các ngày.
+const mqMobile = matchMedia('(max-width: 860px)');
+const placePanel = () => {
+  if (mqMobile.matches) $('#days').before(placesEl);
+  else $('.mapwrap').append(placesEl);
+};
+mqMobile.addEventListener('change', placePanel);
+placePanel();
+
+/* ---------- Kéo đổi độ rộng cột lịch trình ---------- */
+const SIDE_W = 'travel-plan:side-w';
+const resizer = $('#resizer');
+let sideW = Number(ls.get(SIDE_W)) || 0;
+let resizeFrame = 0;
+const applySideW = () => {
+  if (!sideW) return document.documentElement.style.removeProperty('--side-w');
+  const w = Math.round(Math.min(Math.max(sideW, 340), window.innerWidth - 360));
+  document.documentElement.style.setProperty('--side-w', `${w}px`);
+};
+const refreshMapSize = () => {
+  cancelAnimationFrame(resizeFrame);
+  resizeFrame = requestAnimationFrame(() => map.invalidateSize());
+};
+applySideW();
+window.addEventListener('resize', applySideW);
+
+resizer.addEventListener('pointerdown', (e) => {
+  e.preventDefault();
+  resizer.setPointerCapture(e.pointerId);
+  document.body.classList.add('resizing');
+  const move = (ev) => {
+    sideW = ev.clientX - resizer.offsetWidth / 2;
+    applySideW();
+    refreshMapSize();
+  };
+  const up = () => {
+    resizer.removeEventListener('pointermove', move);
+    resizer.removeEventListener('pointerup', up);
+    resizer.removeEventListener('pointercancel', up);
+    document.body.classList.remove('resizing');
+    ls.set(SIDE_W, sideW ? String(Math.round(sideW)) : null);
+    refreshMapSize();
+  };
+  resizer.addEventListener('pointermove', move);
+  resizer.addEventListener('pointerup', up);
+  resizer.addEventListener('pointercancel', up);
+});
+resizer.addEventListener('dblclick', () => {
+  sideW = 0;
+  ls.set(SIDE_W, null);
+  applySideW();
+  refreshMapSize();
 });
 
 /* ---------- Lightbox ---------- */
