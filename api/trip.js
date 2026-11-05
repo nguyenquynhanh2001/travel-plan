@@ -1,5 +1,7 @@
-// GET  /api/trip?id=main  → { data, version, updatedAt }   (ai cũng xem được)
-// PUT  /api/trip?id=main  ← { data, version, force? }      (cần header X-Edit-Key)
+// GET    /api/trip?id=main  → { data, version, updatedAt }   (ai cũng xem được)
+// PUT    /api/trip?id=main  ← { data, version, force? }      (cần header X-Edit-Key)
+// PATCH  /api/trip?id=main  ← { title }  đổi tên             (cần header X-Edit-Key)
+// DELETE /api/trip?id=main                                   (cần header X-Edit-Key)
 // version là số lần lưu; gửi sai version (đã bị sửa ở máy khác) thì trả 409.
 import { db, fail, query, readBody, requireEditor, route, send } from './_lib.js';
 
@@ -45,5 +47,25 @@ export default route({
       return send(res, 409, { error: 'Lịch trình đã được sửa ở nơi khác', version: cur?.version ?? 0 });
     }
     send(res, 200, { version: rows[0].version, updatedAt: rows[0].updated_at });
+  },
+
+  // Tăng version để máy nào đang mở chuyến đi này biết là đã có thay đổi.
+  async PATCH(req, res) {
+    requireEditor(req);
+    const { title } = await readBody(req);
+    const name = String(title ?? '').trim();
+    if (!name) throw fail(400, 'Thiếu tên chuyến đi');
+    const [row] = await db()`update trips
+      set data = jsonb_set(data, '{title}', to_jsonb(${name}::text)), version = version + 1, updated_at = now()
+      where id = ${tripId(req)} returning version, updated_at`;
+    if (!row) throw fail(404, 'Không có chuyến đi này');
+    send(res, 200, { version: row.version, updatedAt: row.updated_at });
+  },
+
+  async DELETE(req, res) {
+    requireEditor(req);
+    const [row] = await db()`delete from trips where id = ${tripId(req)} returning id`;
+    if (!row) throw fail(404, 'Không có chuyến đi này');
+    send(res, 200, { ok: true });
   },
 });

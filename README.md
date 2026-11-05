@@ -3,7 +3,8 @@
 Trang lập lịch trình chuyến đi gồm giờ, địa điểm, bản đồ và ảnh, kèm tab **Chi tiêu** để ghi ai chi khoản gì, bao nhiêu và tính ai cần trả ai.
 
 - Web: https://nguyenquynhanh2001.github.io/travel-plan/
-- Nhiều chuyến đi: thêm `?trip=ten-chuyen-di` vào link (mặc định là `main`).
+- Link không có `?trip=` thì hiện danh sách chuyến đi: ai cũng xem/mở được; tạo, đổi tên, xoá cần mã chỉnh sửa.
+- Mỗi chuyến đi có link riêng `?trip=ten-chuyen-di` (tạo từ tên, bỏ dấu).
 - Link mở thẳng tab Chi tiêu: thêm `#chi-tieu` vào cuối link.
 
 ## Kiến trúc
@@ -20,8 +21,12 @@ Neon PostgreSQL (bảng trips, images — tự tạo ở lần gọi đầu)
 
 | API | Quyền | Mô tả |
 |---|---|---|
+| `GET /api/trips` | ai cũng gọi được | Danh sách chuyến đi kèm tóm tắt (số ngày, điểm, người, tổng chi, ảnh bìa) |
+| `POST /api/trips` | `X-Edit-Key` | Tạo chuyến đi `{ title, data }` → `{ id }` |
 | `GET /api/trip?id=main` | ai cũng gọi được | Lấy lịch trình `{ data, version, updatedAt }` |
 | `PUT /api/trip?id=main` | `X-Edit-Key` | Lưu `{ data, version }`; sai version thì trả 409 |
+| `PATCH /api/trip?id=main` | `X-Edit-Key` | Đổi tên `{ title }` |
+| `DELETE /api/trip?id=main` | `X-Edit-Key` | Xoá chuyến đi |
 | `POST /api/images` | `X-Edit-Key` | Tải ảnh lên `{ mime, data(base64) }` → `{ id }` |
 | `GET /api/images/:id` | ai cũng gọi được | Trả file ảnh, cache vĩnh viễn |
 | `GET /api/auth` | `X-Edit-Key` | Kiểm tra mã chỉnh sửa và kết nối DB |

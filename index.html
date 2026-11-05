@@ -60,6 +60,42 @@
   .brand img { width: 36px; height: 36px; flex: none; filter: drop-shadow(0 2px 4px rgba(15, 118, 110, .25)); }
   .brand b { display: block; font-size: 17px; letter-spacing: -.01em; line-height: 1.1; }
   .brand small { display: block; color: var(--muted); font-size: 11.5px; letter-spacing: .03em; }
+  .back-link { margin-left: auto; font-size: 13px; font-weight: 600; color: var(--accent); text-decoration: none; }
+  .back-link:hover { text-decoration: underline; }
+
+  /* Trang danh sách chuyến đi (khi link không có ?trip=) */
+  .home-mode .app { display: none; }
+  .home { max-width: 1040px; margin: 0 auto; padding: 24px 20px 60px; }
+  .home-top { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 28px; }
+  .home-top .toolbar { margin-left: auto; }
+  .home-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 16px; }
+  .home-head h1 { font-size: 24px; margin: 0; }
+  .home-head .btn { margin-left: auto; }
+  .notice { background: color-mix(in srgb, var(--danger) 10%, var(--panel)); color: var(--danger); border-radius: 10px; padding: 10px 12px; margin-bottom: 16px; font-size: 13px; }
+  .trips { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 16px; }
+  .trip {
+    position: relative; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; overflow: hidden;
+    transition: box-shadow .15s, transform .15s;
+  }
+  .trip:hover { box-shadow: 0 6px 20px rgba(0,0,0,.08); transform: translateY(-2px); }
+  .trip-cover { aspect-ratio: 16 / 9; background: var(--g); display: grid; place-items: center; font-size: 42px; }
+  .trip-cover img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .trip-body { padding: 12px 14px 14px; display: flex; flex-direction: column; gap: 4px; }
+  .trip-link { font-size: 16px; font-weight: 700; color: var(--ink); text-decoration: none; }
+  .trip-link::after { content: ""; position: absolute; inset: 0; }
+  .trip-link:focus-visible { outline: none; }
+  .trip:has(.trip-link:focus-visible) { box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 40%, transparent); }
+  .trip-date { font-size: 13px; }
+  .trip-meta, .trip-upd { font-size: 12.5px; color: var(--muted); }
+  .trip-acts { position: absolute; top: 8px; right: 8px; display: flex; gap: 4px; z-index: 1; }
+  .trip-acts .icon-btn { background: rgba(255,255,255,.92); box-shadow: 0 1px 4px rgba(0,0,0,.15); }
+  .trip-acts .icon-btn:hover { background: #fff; }
+  .trip-new {
+    border: 1.5px dashed var(--line); border-radius: 14px; background: transparent; color: var(--muted);
+    font-weight: 600; min-height: 200px; font-size: 14px;
+  }
+  .trip-new span { display: block; font-size: 30px; line-height: 1; margin-bottom: 6px; }
+  .trip-new:hover { border-color: var(--accent); color: var(--accent); }
   .trip-title {
     font-size: 24px; font-weight: 700; border: 0; background: transparent; padding: 4px 0;
     border-bottom: 2px dashed transparent; width: 100%;
@@ -408,12 +444,29 @@
 </style>
 </head>
 <body>
+<div class="home" id="home" hidden>
+  <div class="home-top">
+    <div class="brand">
+      <img src="logo.svg" alt="">
+      <div><b>Đi thôi</b><small>Lịch trình · Chi tiêu</small></div>
+    </div>
+    <div class="toolbar"><button class="btn" id="homeKey"></button></div>
+  </div>
+  <div class="notice" id="homeNotice" hidden></div>
+  <div class="home-head">
+    <h1>Các chuyến đi</h1>
+    <button class="btn primary" id="homeNew" hidden>+ Chuyến đi mới</button>
+  </div>
+  <div class="trips" id="trips"></div>
+</div>
+
 <div class="app" id="app">
   <aside class="side">
     <div class="top">
       <div class="brand">
         <img src="logo.svg" alt="">
         <div><b>Đi thôi</b><small>Lịch trình · Chi tiêu</small></div>
+        <a class="back-link" id="backLink" href="./" hidden>← Các chuyến đi</a>
       </div>
       <input class="trip-title" id="tripTitle" placeholder="Tên chuyến đi">
       <div class="toolbar">
@@ -469,6 +522,19 @@
     <div class="dlg-actions">
       <button type="button" class="btn" id="keyCancel">Huỷ</button>
       <button type="submit" class="btn primary">Vào chỉnh sửa</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog class="dlg" id="tripDlg">
+  <form id="tripForm">
+    <h3 id="tripDlgTitle"></h3>
+    <p id="tripDlgText"></p>
+    <input id="tripDlgInput" autocomplete="off">
+    <div class="dlg-err" id="tripDlgErr"></div>
+    <div class="dlg-actions">
+      <button type="button" class="btn" id="tripDlgCancel">Huỷ</button>
+      <button type="submit" class="btn" id="tripDlgOk"></button>
     </div>
   </form>
 </dialog>
@@ -567,7 +633,8 @@ const ls = {
    Có API, chưa có mã → chỉ xem bản trên server (người được share link).
    Có API và mã       → chỉnh sửa, tự lưu lên server. */
 const API = (window.TRAVEL_API || (/^(localhost|127\.0\.0\.1)$/.test(location.hostname) ? location.origin : '')).replace(/\/+$/, '');
-const TRIP = new URLSearchParams(location.search).get('trip') || 'main';
+// Có server mà link không có ?trip= thì hiện danh sách chuyến đi; không có server thì chỉ có 1 chuyến 'main'.
+const TRIP = new URLSearchParams(location.search).get('trip') || (API ? null : 'main');
 const LOCAL_KEY = `trip:${TRIP}`;
 const EDIT_KEY_STORE = 'travel-plan:edit-key';
 let editKey = API ? ls.get(EDIT_KEY_STORE) : null;
@@ -2046,8 +2113,162 @@ $('#resetForm').addEventListener('submit', async (e) => {
   toast('Đã xoá hết');
 });
 
+/* ---------- Danh sách chuyến đi ---------- */
+const COVERS = ['#1fb5a3, #0b5f59', '#ff8a5b, #e4572e', '#5aa9f0, #2e5fde', '#f2b84b, #d9822b', '#9b8cf2, #6247c9'];
+const coverOf = (id) => COVERS[[...id].reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7) % COVERS.length];
+const fmtDay = (d) => d.split('-').reverse().join('/');
+let trips = [];
+
+const tripCardHTML = (t) => {
+  const range = t.startDate ? (t.startDate === t.endDate ? fmtDay(t.startDate) : `${fmtDay(t.startDate)} – ${fmtDay(t.endDate)}`) : '';
+  const meta = [`${t.days} ngày`, `${t.stops} điểm`, t.people && `${t.people} người`, t.spent && fmtMoney(t.spent)].filter(Boolean);
+  return `<article class="trip" data-id="${esc(t.id)}">
+    <div class="trip-cover" style="--g: linear-gradient(135deg, ${coverOf(t.id)})">
+      ${t.cover ? `<img src="${esc(imgSrc(t.cover))}" alt="" loading="lazy">` : '🗺️'}
+    </div>
+    <div class="trip-body">
+      <a class="trip-link" href="?trip=${encodeURIComponent(t.id)}">${esc(t.title || t.id)}</a>
+      ${range ? `<div class="trip-date">📅 ${range}</div>` : ''}
+      <div class="trip-meta">${meta.join(' · ')}</div>
+      <div class="trip-upd">Cập nhật ${fmtDate(t.updatedAt)}</div>
+    </div>
+    ${editing() ? `<div class="trip-acts">
+      <button class="icon-btn" data-action="rename" title="Đổi tên">✎</button>
+      <button class="icon-btn" data-action="delete" title="Xoá chuyến đi">🗑</button>
+    </div>` : ''}
+  </article>`;
+};
+
+const renderTrips = () => {
+  const add = editing() ? '<button class="trip-new" data-action="new"><span>＋</span>Chuyến đi mới</button>' : '';
+  $('#trips').innerHTML = trips.length || add
+    ? trips.map(tripCardHTML).join('') + add
+    : '<p class="hint">Chưa có chuyến đi nào. Bấm "✎ Chỉnh sửa" và nhập mã để tạo chuyến đi.</p>';
+};
+
+const loadTrips = async () => {
+  $('#trips').innerHTML = '<p class="hint">Đang tải…</p>';
+  try {
+    ({ trips } = await api('/api/trips', { key: null }));
+    renderTrips();
+  } catch (e) {
+    console.error(e);
+    $('#trips').innerHTML = `<p class="hint">⚠ Không tải được danh sách (${esc(e.message)}). <button class="link" data-action="retry">Thử lại</button></p>`;
+  }
+};
+
+const showHome = (notice) => {
+  document.body.classList.add('home-mode');
+  document.title = 'Các chuyến đi · Đi thôi';
+  $('#home').hidden = false;
+  $('#homeNotice').hidden = !notice;
+  $('#homeNotice').textContent = notice || '';
+  $('#homeNew').hidden = !editing();
+  $('#homeKey').textContent = editing() ? '🔑 Thoát sửa' : '✎ Chỉnh sửa';
+  $('#homeKey').title = editing() ? 'Thoát chế độ chỉnh sửa trên máy này' : 'Nhập mã để tạo, đổi tên, xoá chuyến đi';
+  loadTrips();
+};
+
+// Hộp thoại dùng chung cho tạo / đổi tên / xoá. submit(value) lỗi thì hiện lỗi, xong thì đóng.
+const tripDlg = $('#tripDlg');
+let tripDlgSubmit = null;
+const openTripDlg = ({ title, text, value = '', placeholder, password = false, ok, danger = false, submit }) => {
+  $('#tripDlgTitle').textContent = title;
+  $('#tripDlgText').innerHTML = text;
+  const input = $('#tripDlgInput');
+  input.type = password ? 'password' : 'text';
+  input.value = value;
+  input.placeholder = placeholder;
+  $('#tripDlgErr').textContent = '';
+  $('#tripDlgOk').textContent = ok;
+  $('#tripDlgOk').className = `btn ${danger ? 'danger-solid' : 'primary'}`;
+  tripDlgSubmit = submit;
+  tripDlg.showModal();
+  input.select();
+};
+$('#tripDlgCancel').addEventListener('click', () => tripDlg.close());
+$('#tripForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const value = $('#tripDlgInput').value.trim();
+  if (!value) return $('#tripDlgInput').focus();
+  $('#tripDlgErr').textContent = 'Đang xử lý…';
+  try {
+    await tripDlgSubmit(value);
+    tripDlg.close();
+  } catch (err) {
+    $('#tripDlgErr').textContent = err.status === 401 ? 'Sai mã chỉnh sửa' : `Lỗi: ${err.message}`;
+  }
+});
+
+const newTrip = () => openTripDlg({
+  title: 'Chuyến đi mới',
+  text: 'Đặt tên cho chuyến đi. Tên này cũng dùng để tạo link, ví dụ <b>Cao Bằng</b> → <code>?trip=cao-bang</code>.',
+  placeholder: 'Tên chuyến đi (vd: Hà Giang 3N2Đ)',
+  ok: 'Tạo',
+  submit: async (title) => {
+    const { id } = await api('/api/trips', { method: 'POST', body: { title, data: { ...defaultState(), title } } });
+    location.href = `?trip=${encodeURIComponent(id)}`;
+  },
+});
+
+$('#homeNew').addEventListener('click', newTrip);
+$('#homeKey').addEventListener('click', () => {
+  if (!editing()) {
+    $('#keyInput').value = '';
+    $('#keyErr').textContent = '';
+    return keyDlg.showModal();
+  }
+  if (!confirm('Thoát chế độ chỉnh sửa trên máy này?')) return;
+  ls.set(EDIT_KEY_STORE, null);
+  location.reload();
+});
+
+$('#trips').addEventListener('click', (e) => {
+  const btn = e.target.closest('[data-action]');
+  if (!btn) return;
+  if (btn.dataset.action === 'retry') return loadTrips();
+  if (btn.dataset.action === 'new') return newTrip();
+  const t = trips.find((x) => x.id === btn.closest('.trip')?.dataset.id);
+  if (!t || !editing()) return;
+  const path = `/api/trip?id=${encodeURIComponent(t.id)}`;
+  if (btn.dataset.action === 'rename') {
+    openTripDlg({
+      title: 'Đổi tên chuyến đi',
+      text: 'Link của chuyến đi giữ nguyên, chỉ đổi tên hiển thị.',
+      value: t.title || '',
+      placeholder: 'Tên chuyến đi',
+      ok: 'Lưu',
+      submit: async (title) => {
+        const r = await api(path, { method: 'PATCH', body: { title } });
+        Object.assign(t, { title, updatedAt: r.updatedAt });
+        renderTrips();
+        toast('Đã đổi tên');
+      },
+    });
+  } else if (btn.dataset.action === 'delete') {
+    openTripDlg({
+      title: `Xoá "${t.title || t.id}"?`,
+      text: 'Toàn bộ lịch trình, địa điểm và chi tiêu của chuyến đi này sẽ bị xoá khỏi server, ai mở link cũng không xem được nữa. <b>Không hoàn tác được.</b>',
+      placeholder: 'Nhập lại mã chỉnh sửa để xác nhận',
+      password: true,
+      ok: 'Xoá chuyến đi',
+      danger: true,
+      submit: async (key) => {
+        await api(path, { method: 'DELETE', key });
+        // Bỏ bản nháp trên máy, không thì mở lại link sẽ tự tạo lại chuyến đi.
+        await store.set(`trip:${t.id}`, null).catch(() => {});
+        trips = trips.filter((x) => x !== t);
+        renderTrips();
+        toast('Đã xoá chuyến đi');
+      },
+    });
+  }
+});
+
 /* ---------- Khởi động ---------- */
 (async () => {
+  if (!TRIP) return showHome();
+  $('#backLink').hidden = !API;
   let local = null;
   try {
     local = await store.get(LOCAL_KEY);
@@ -2066,10 +2287,15 @@ $('#resetForm').addEventListener('submit', async (e) => {
     catch (e) { console.error(e); remoteFailed = true; }
   }
 
+  // Server trả 404 mà máy không có thay đổi chưa lưu → chuyến đi đã bị xoá hoặc link sai.
+  if (API && !remote && !remoteFailed && !local?.dirty) {
+    return showHome(`Không tìm thấy chuyến đi "${TRIP}". Có thể nó đã bị xoá hoặc link bị sai.`);
+  }
+
   if (!API) {
     state = local?.state;
   } else if (editKey) {
-    // Có thay đổi chưa lên server (hoặc server chưa có gì) thì dùng bản trên máy và đẩy lên.
+    // Có thay đổi chưa lên server (hoặc mất mạng) thì dùng bản trên máy và đẩy lên.
     if (local && (local.dirty || !remote)) {
       state = local.state;
       sync.version = local.version || 0;

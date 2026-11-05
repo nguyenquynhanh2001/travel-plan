@@ -10,6 +10,7 @@ const port = Number(process.env.PORT) || 3000;
 
 const routes = [
   [/^\/api\/trip$/, 'api/trip.js'],
+  [/^\/api\/trips$/, 'api/trips.js'],
   [/^\/api\/auth$/, 'api/auth.js'],
   [/^\/api\/images$/, 'api/images/index.js'],
   [/^\/api\/images\/[^/]+$/, 'api/images/[hash].js'],
