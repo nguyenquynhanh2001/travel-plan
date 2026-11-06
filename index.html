@@ -568,7 +568,6 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="config.js"></script>
 <script>
-const MAX_IMG = 4;
 const $ = (s) => document.querySelector(s);
 const uid = () => Math.random().toString(36).slice(2, 10);
 const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -808,7 +807,7 @@ const stopHTML = (s, i) => `
       <textarea class="f-note" rows="2" placeholder="Ghi chú: ăn gì, giá vé, giờ mở cửa…">${esc(s.note)}</textarea>
       <div class="gallery">
         ${s.images.map((src, k) => `<div class="thumb"><img src="${esc(imgSrc(src))}" data-action="view" data-i="${k}" alt="" loading="lazy"><button class="x" data-action="del-img" data-i="${k}" title="Xoá ảnh">✕</button></div>`).join('')}
-        ${s.images.length < MAX_IMG ? `<button class="paste-zone" data-action="pick-img"><span>＋</span>Dán ảnh (Ctrl+V)<br>hoặc bấm để chọn</button>` : ''}
+        <button class="paste-zone" data-action="pick-img"><span>＋</span>Dán ảnh (Ctrl+V)<br>hoặc bấm để chọn</button>
       </div>
     </div>
   </div>`;
@@ -1080,10 +1079,7 @@ const compress = async (file) => {
 const pushImages = async (target, files) => {
   const imgs = files.filter((x) => x && x.type.startsWith('image/'));
   if (!target || !imgs.length) return false;
-  const room = MAX_IMG - target.images.length;
-  if (room <= 0) { toast(`Mỗi điểm tối đa ${MAX_IMG} ảnh`); return false; }
-  if (imgs.length > room) toast(`Chỉ thêm ${room} ảnh (tối đa ${MAX_IMG} ảnh/điểm)`);
-  for (const file of imgs.slice(0, room)) {
+  for (const file of imgs) {
     try { target.images.push(await compress(file)); }
     catch (e) { console.error(e); toast('Không đọc được 1 ảnh'); }
   }
@@ -1287,7 +1283,7 @@ const placeItemHTML = (p, days) => `<div class="pl-item ${p.id === activePlaceId
       <textarea class="pl-note" rows="${Math.max(1, (p.note || '').split('\n').length)}" placeholder="📝 Ghi chú">${esc(p.note)}</textarea>
       <div class="gallery pl-gallery">
         ${p.images.map((src, k) => `<div class="thumb"><img src="${esc(imgSrc(src))}" data-action="pl-view" data-i="${k}" alt="" loading="lazy"><button class="x" data-action="pl-del-img" data-i="${k}" title="Xoá ảnh">✕</button></div>`).join('')}
-        ${p.images.length < MAX_IMG ? '<button class="paste-zone" data-action="pl-pick-img" title="Bấm để chọn ảnh, hoặc chọn địa điểm rồi Ctrl+V / kéo thả ảnh vào"><span>＋</span>Dán ảnh</button>' : ''}
+        <button class="paste-zone" data-action="pl-pick-img" title="Bấm để chọn ảnh, hoặc chọn địa điểm rồi Ctrl+V / kéo thả ảnh vào"><span>＋</span>Dán ảnh</button>
       </div>
     </div>
     ${plAdding === p.id ? `<div class="pl-days">${state.days.map((d) => `<button class="chip" data-action="pl-to-day" data-day="${d.id}">→ ${esc(dayLabel(d))}</button>`).join('')}</div>` : ''}
