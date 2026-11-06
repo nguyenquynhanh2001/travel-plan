@@ -320,6 +320,14 @@
     font-size: 12.5px; padding: 2px 0; resize: none; overflow: hidden; line-height: 1.4;
   }
   .pl-price { font-weight: 600; color: var(--danger); }
+  .pl-item.active { box-shadow: 0 0 0 2px var(--accent); }
+  .pl-item.drag { box-shadow: 0 0 0 2px var(--accent); background: color-mix(in srgb, var(--accent) 8%, var(--soft)); }
+  .pl-gallery { margin-top: 4px; gap: 4px; }
+  .pl-gallery .paste-zone { font-size: 10.5px; padding: 2px; }
+  .pl-gallery .paste-zone span { font-size: 16px; margin-bottom: 2px; }
+  .pl-item.active .paste-zone { border-color: var(--accent); color: var(--accent); }
+  /* Chưa có ảnh thì chỉ hiện ô dán ảnh khi đang chọn địa điểm đó, cho danh sách gọn */
+  .pl-item:not(.active):not(.drag) .pl-gallery:not(:has(.thumb)) { display: none; }
   .pl-price:focus, .pl-note:focus { outline: none; border-bottom-color: var(--line); }
   .pl-price:hover, .pl-note:hover { border-bottom-color: var(--line); }
   .pop .meta { margin-top: 4px; font-size: 12px; white-space: pre-line; }
@@ -582,7 +590,8 @@ const defaultState = () => ({
 });
 // Dữ liệu cũ (trước khi có khoảng cách / chi tiêu) thiếu các trường này.
 const normalize = (s) => ({
-  ...s, distances: s.distances || {}, people: s.people || [], expenses: s.expenses || [], places: s.places || [],
+  ...s, distances: s.distances || {}, people: s.people || [], expenses: s.expenses || [],
+  places: (s.places || []).map((p) => ({ images: [], ...p })),
 });
 
 let state;
@@ -832,8 +841,12 @@ const render = () => {
   renderMap();
 };
 
+// Ctrl+V dán ảnh vào thứ được chọn gần nhất: điểm trong lịch trình hay địa điểm trong danh sách.
+let lastActive = 'stop';
+let activePlaceId = null;
 const setActive = (id) => {
   activeStopId = id;
+  lastActive = 'stop';
   document.querySelectorAll('.stop.active').forEach((el) => el.classList.remove('active'));
   document.querySelector(`.stop[data-id="${id}"]`)?.classList.add('active');
 };
@@ -1063,21 +1076,37 @@ const compress = async (file) => {
   return c.toDataURL('image/jpeg', 0.85);
 };
 
-const addImages = async (stopId, files) => {
-  const f = findStop(stopId);
-  if (!f) return;
+// Thêm ảnh vào target.images (điểm trong lịch trình hoặc địa điểm trong danh sách); true nếu có thêm.
+const pushImages = async (target, files) => {
   const imgs = files.filter((x) => x && x.type.startsWith('image/'));
-  if (!imgs.length) return;
-  const room = MAX_IMG - f.stop.images.length;
-  if (room <= 0) return toast(`Mỗi điểm tối đa ${MAX_IMG} ảnh`);
+  if (!target || !imgs.length) return false;
+  const room = MAX_IMG - target.images.length;
+  if (room <= 0) { toast(`Mỗi điểm tối đa ${MAX_IMG} ảnh`); return false; }
   if (imgs.length > room) toast(`Chỉ thêm ${room} ảnh (tối đa ${MAX_IMG} ảnh/điểm)`);
   for (const file of imgs.slice(0, room)) {
-    try { f.stop.images.push(await compress(file)); }
+    try { target.images.push(await compress(file)); }
     catch (e) { console.error(e); toast('Không đọc được 1 ảnh'); }
   }
+  return true;
+};
+
+const addImages = async (stopId, files) => {
+  if (!(await pushImages(findStop(stopId)?.stop, files))) return;
   render();
   save();
 };
+
+const addPlaceImages = async (plid, files) => {
+  const p = state.places.find((x) => x.id === plid);
+  if (!(await pushImages(p, files))) return;
+  renderPlaces();
+  renderMap();
+  save();
+};
+
+// Ô "chọn ảnh" dùng chung một input file, nên nhớ ảnh sẽ vào đâu.
+let imgTarget = null; // { kind: 'stop' | 'place', id }
+const pickImage = (kind, id) => { imgTarget = { kind, id }; $('#fileImg').click(); };
 
 document.addEventListener('paste', (e) => {
   if (viewer || tab === 'money') return;
@@ -1086,14 +1115,18 @@ document.addEventListener('paste', (e) => {
     .map((i) => i.getAsFile());
   if (!files.length) return;
   e.preventDefault();
+  const plid = e.target.closest?.('.pl-item')?.dataset.plid || (!e.target.closest?.('.stop') && lastActive === 'place' && activePlaceId);
+  if (plid && state.places.some((x) => x.id === plid)) return addPlaceImages(plid, files);
   const id = e.target.closest?.('.stop')?.dataset.id || activeStopId;
   if (!id || !findStop(id)) return toast('Bấm chọn một điểm trước, rồi Ctrl+V');
   addImages(id, files);
 });
 
 $('#fileImg').addEventListener('change', (e) => {
-  if (activeStopId) addImages(activeStopId, [...e.target.files]);
+  const files = [...e.target.files];
   e.target.value = '';
+  if (imgTarget?.kind === 'place') addPlaceImages(imgTarget.id, files);
+  else if (imgTarget) addImages(imgTarget.id, files);
 });
 
 /* ---------- Kéo thả sắp xếp điểm ---------- */
@@ -1233,10 +1266,11 @@ const placePopupHTML = (p) => `<div class="pop">
   <b>${typeOf(p).icon} ${esc(p.name || p.place.name)}</b><br>
   <span class="t">${typeOf(p).label} · ${esc(p.place.name)}</span>
   ${p.price || p.note ? `<div class="meta">${p.price ? `<b>💰 ${esc(p.price)}</b>${p.note ? '<br>' : ''}` : ''}${esc(p.note)}</div>` : ''}
+  ${p.images.length ? `<div class="imgs">${p.images.slice(0, 3).map((src) => `<img src="${esc(imgSrc(src))}" alt="">`).join('')}</div>` : ''}
   ${viewer ? '' : `<div class="pop-add">${state.days.map((d) => `<button data-pl-to="${p.id}" data-day="${d.id}">+ ${esc(dayLabel(d))}</button>`).join('')}</div>`}
 </div>`;
 
-const placeItemHTML = (p, days) => `<div class="pl-item" data-plid="${p.id}">
+const placeItemHTML = (p, days) => `<div class="pl-item ${p.id === activePlaceId ? 'active' : ''}" data-plid="${p.id}">
     <span class="handle" draggable="true" title="Kéo vào lịch trình">⋮⋮</span>
     <button class="pl-ic" data-action="pl-type" title="${typeOf(p).label} · bấm để đổi loại">${typeOf(p).icon}</button>
     <div class="pl-main">
@@ -1251,6 +1285,10 @@ const placeItemHTML = (p, days) => `<div class="pl-item" data-plid="${p.id}">
     <div class="pl-extra">
       <input class="pl-price" value="${esc(p.price)}" placeholder="💰 Giá (vd: 350k/đêm, 50k/người)">
       <textarea class="pl-note" rows="${Math.max(1, (p.note || '').split('\n').length)}" placeholder="📝 Ghi chú">${esc(p.note)}</textarea>
+      <div class="gallery pl-gallery">
+        ${p.images.map((src, k) => `<div class="thumb"><img src="${esc(imgSrc(src))}" data-action="pl-view" data-i="${k}" alt="" loading="lazy"><button class="x" data-action="pl-del-img" data-i="${k}" title="Xoá ảnh">✕</button></div>`).join('')}
+        ${p.images.length < MAX_IMG ? '<button class="paste-zone" data-action="pl-pick-img" title="Bấm để chọn ảnh, hoặc chọn địa điểm rồi Ctrl+V / kéo thả ảnh vào"><span>＋</span>Dán ảnh</button>' : ''}
+      </div>
     </div>
     ${plAdding === p.id ? `<div class="pl-days">${state.days.map((d) => `<button class="chip" data-action="pl-to-day" data-day="${d.id}">→ ${esc(dayLabel(d))}</button>`).join('')}</div>` : ''}
   </div>`;
@@ -1272,7 +1310,7 @@ const renderPlaces = () => {
 };
 
 const addPlace = (name, place) => {
-  state.places.unshift({ id: uid(), type: plFilter === 'all' ? 'checkin' : plFilter, name, place, price: '', note: '' });
+  state.places.unshift({ id: uid(), type: plFilter === 'all' ? 'checkin' : plFilter, name, place, price: '', note: '', images: [] });
   $('#plInput').value = '';
   $('#plResults').innerHTML = '';
   renderPlaces();
@@ -1328,7 +1366,7 @@ const insertPlace = (plid, dayId, beforeId) => {
   const at = idx < 0 ? day.stops.length : idx;
   const s = {
     ...newStop(timeBetween(day.stops[at - 1]?.time, day.stops[at]?.time)),
-    name: p.name, place: p.place && { ...p.place }, placeId: p.id,
+    name: p.name, place: p.place && { ...p.place }, placeId: p.id, images: [...p.images],
     note: [p.price && `Giá: ${p.price}`, p.note].filter(Boolean).join('\n'),
   };
   day.stops.splice(at, 0, s);
@@ -1368,6 +1406,7 @@ placesEl.addEventListener('click', (e) => {
       return;
     case 'pl-filter': plFilter = btn.dataset.f; renderPlaces(); renderMap(); return;
     case 'pl-focus': focusPlace(id); return;
+    case 'pl-view': openLb(() => state.places.find((x) => x.id === id)?.images, Number(btn.dataset.i)); return;
   }
   if (viewer) return;
   switch (btn.dataset.action) {
@@ -1379,6 +1418,8 @@ placesEl.addEventListener('click', (e) => {
     case 'pl-add': plAdding = plAdding === id ? null : id; renderPlaces(); return;
     case 'pl-to-day': insertPlace(id, btn.dataset.day); return;
     case 'pl-del': state.places = state.places.filter((x) => x !== p); break;
+    case 'pl-pick-img': pickImage('place', id); return;
+    case 'pl-del-img': p.images.splice(Number(btn.dataset.i), 1); break;
     case 'pl-choose': {
       const r = plResults[Number(btn.dataset.i)];
       if (r) addPlace(r.name || shortName(r.display_name), { lat: Number(r.lat), lng: Number(r.lon), name: shortName(r.display_name) });
@@ -1401,6 +1442,45 @@ placesEl.addEventListener('input', (e) => {
   if (field === 'note') { t.style.height = 'auto'; t.style.height = `${t.scrollHeight}px`; }
   placeMarkers[p.id]?.setPopupContent(placePopupHTML(p));
   save();
+});
+
+// Chọn một địa điểm (để Ctrl+V dán ảnh vào nó).
+const setPlaceActive = (id) => {
+  if (viewer) return;
+  activePlaceId = id;
+  lastActive = 'place';
+  placesEl.querySelectorAll('.pl-item.active').forEach((el) => el.classList.toggle('active', el.dataset.plid === id));
+  placesEl.querySelector(`.pl-item[data-plid="${id}"]`)?.classList.add('active');
+};
+placesEl.addEventListener('focusin', (e) => {
+  const item = e.target.closest('.pl-item');
+  if (item) setPlaceActive(item.dataset.plid);
+});
+placesEl.addEventListener('mousedown', (e) => {
+  const item = e.target.closest('.pl-item');
+  if (item) setPlaceActive(item.dataset.plid);
+});
+
+// Kéo thả file ảnh vào một địa điểm.
+placesEl.addEventListener('dragover', (e) => {
+  if (viewer || placeDragId || !e.dataTransfer.types.includes('Files')) return;
+  const item = e.target.closest('.pl-item');
+  if (!item) return;
+  e.preventDefault();
+  placesEl.querySelectorAll('.pl-item.drag').forEach((el) => el !== item && el.classList.remove('drag'));
+  item.classList.add('drag');
+});
+placesEl.addEventListener('dragleave', (e) => {
+  const item = e.target.closest('.pl-item');
+  if (item && !item.contains(e.relatedTarget)) item.classList.remove('drag');
+});
+placesEl.addEventListener('drop', (e) => {
+  const item = e.target.closest('.pl-item');
+  if (viewer || placeDragId || !item || !e.dataTransfer.files.length) return;
+  e.preventDefault();
+  item.classList.remove('drag');
+  setPlaceActive(item.dataset.plid);
+  addPlaceImages(item.dataset.plid, [...e.dataTransfer.files]);
 });
 
 placesEl.addEventListener('dragstart', (e) => {
@@ -1481,10 +1561,11 @@ resizer.addEventListener('dblclick', () => {
 });
 
 /* ---------- Lightbox ---------- */
-let lb = null;
-const showLb = () => { $('#lbImg').src = imgSrc(findStop(lb.id).stop.images[lb.i]); $('#lb').classList.add('show'); };
+let lb = null; // { list: () => mảng ảnh đang xem, i }
+const showLb = () => { $('#lbImg').src = imgSrc(lb.list()[lb.i]); $('#lb').classList.add('show'); };
+const openLb = (list, i) => { lb = { list, i }; showLb(); };
 const moveLb = (step) => {
-  const n = findStop(lb.id).stop.images.length;
+  const n = lb.list().length;
   lb.i = (lb.i + step + n) % n;
   showLb();
 };
@@ -1590,9 +1671,9 @@ daysEl.addEventListener('click', (e) => {
     case 'pick-map': startPicking(id); break;
     case 'clear-place': f.stop.place = null; render(); save(); break;
     case 'focus': focusStopOnMap(id); break;
-    case 'pick-img': $('#fileImg').click(); break;
+    case 'pick-img': pickImage('stop', id); break;
     case 'del-img': f.stop.images.splice(i, 1); render(); save(); break;
-    case 'view': lb = { id, i }; showLb(); break;
+    case 'view': openLb(() => findStop(id)?.stop.images, i); break;
   }
 });
 
@@ -1944,14 +2025,12 @@ const fetchTrip = async () => {
 
 // Đưa ảnh data URL lên server rồi thay bằng id (ảnh đang hiện trên trang vẫn giữ nguyên).
 const uploadImages = async () => {
-  for (const day of state.days) {
-    for (const s of day.stops) {
-      for (const src of s.images.filter((x) => x.startsWith('data:'))) {
-        const [head, data] = src.split(',');
-        const { id } = await api('/api/images', { method: 'POST', body: { mime: head.slice(5).split(';')[0], data } });
-        const at = s.images.indexOf(src);
-        if (at > -1) s.images[at] = id;
-      }
+  for (const owner of [...state.days.flatMap((d) => d.stops), ...state.places]) {
+    for (const src of owner.images.filter((x) => x.startsWith('data:'))) {
+      const [head, data] = src.split(',');
+      const { id } = await api('/api/images', { method: 'POST', body: { mime: head.slice(5).split(';')[0], data } });
+      const at = owner.images.indexOf(src);
+      if (at > -1) owner.images[at] = id;
     }
   }
 };
