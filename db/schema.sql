@@ -6,6 +6,14 @@ create table if not exists trips (
   updated_at timestamptz not null default now()
 );
 
+-- Dữ liệu dùng chung cho mọi chuyến đi (vd: id 'poses' = thư viện pose dáng).
+create table if not exists shared (
+  id text primary key,
+  data jsonb not null,
+  version integer not null default 1,
+  updated_at timestamptz not null default now()
+);
+
 create table if not exists images (
   hash text primary key,
   mime text not null,

@@ -221,10 +221,49 @@
   .tabs { display: flex; gap: 4px; background: var(--soft); border-radius: 10px; padding: 4px; }
   .tabs button { flex: 1; border: 0; background: transparent; border-radius: 7px; padding: 7px 10px; font-weight: 600; color: var(--muted); }
   .tabs button.on { background: var(--panel); color: var(--ink); box-shadow: 0 1px 3px rgba(0,0,0,.12); }
-  body:not(.tab-money) #money, .tab-money #days, .tab-money #hint, .tab-money .mapwrap { display: none; }
-  .tab-money .app { grid-template-columns: minmax(0, 1fr); }
-  .tab-money .resizer, .tab-money #places { display: none; }
-  .tab-money .side > * { max-width: 1040px; margin-inline: auto; }
+  body:not(.tab-money) #money, body:not(.tab-poses) #poses,
+  .tab-wide #days, .tab-wide #hint, .tab-wide .mapwrap { display: none; }
+  .tab-wide .app { grid-template-columns: minmax(0, 1fr); }
+  .tab-wide .resizer, .tab-wide #places { display: none; }
+  .tab-wide .side > * { max-width: 1040px; margin-inline: auto; }
+
+  /* Pose dáng */
+  .poses { --c: var(--accent); }
+  .ps-top { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
+  .ps-top .status { margin-left: auto; }
+  .ps-nav { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 18px; }
+  .ps-nav small { opacity: .7; }
+  .ps-add { margin: 0; }
+  .ps-add input { border: 1px dashed var(--line); border-radius: 999px; padding: 4px 12px; width: 150px; background: transparent; font-size: 12.5px; }
+  .ps-add input:focus { outline: none; border-style: solid; border-color: var(--accent); }
+  .ps-group {
+    background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 12px; margin-bottom: 16px;
+    transition: border-color .15s, box-shadow .15s;
+  }
+  .ps-group.active { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 15%, transparent); }
+  .ps-group.drag { border-style: dashed; border-color: var(--accent); }
+  .ps-head { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+  .ps-name { flex: 1; min-width: 0; border: 0; font-size: 16px; font-weight: 700; padding: 4px 2px; border-bottom: 1px solid transparent; background: transparent; }
+  .ps-name:focus { outline: none; border-bottom-color: var(--line); }
+  .ps-head small { color: var(--muted); white-space: nowrap; }
+  .ps-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; }
+  .pose { position: relative; margin: 0; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+  .pose img { width: 100%; aspect-ratio: 3 / 4; object-fit: cover; border-radius: 10px; display: block; cursor: zoom-in; background: var(--soft); }
+  .pose .x {
+    position: absolute; top: 6px; right: 6px; width: 24px; height: 24px; border-radius: 50%; border: 0;
+    background: rgba(0,0,0,.55); color: #fff; font-size: 11px; opacity: 0; transition: opacity .15s;
+  }
+  .pose:hover .x { opacity: 1; }
+  .ps-note { width: 100%; border: 0; border-bottom: 1px solid transparent; background: transparent; font-size: 12.5px; padding: 2px 0; }
+  .ps-note:focus { outline: none; border-bottom-color: var(--line); }
+  .ps-zone {
+    aspect-ratio: 3 / 4; border: 1.5px dashed var(--line); border-radius: 10px; background: transparent;
+    color: var(--muted); font-size: 12px; line-height: 1.4; padding: 6px;
+  }
+  .ps-zone span { display: block; font-size: 24px; line-height: 1; margin-bottom: 6px; }
+  .ps-zone:hover, .ps-group.active .ps-zone { border-color: var(--accent); color: var(--accent); }
+  /* Màn cảm ứng không rê chuột được nên luôn hiện nút xoá ảnh */
+  @media (hover: none) { .thumb .x, .pose .x { opacity: 1; } }
 
   /* Chi tiêu */
   .money { --c: var(--accent); display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 24px; align-items: start; }
@@ -344,6 +383,7 @@
 
   /* Chế độ xem (người được share link) */
   .viewer .handle, .viewer .add, .viewer .paste-zone, .viewer .icon-btn, .viewer .thumb .x,
+  .viewer .pose .x, .viewer .ps-zone, .viewer .ps-add,
   .viewer .search, .viewer .results, .viewer [data-action="clear-place"], .viewer [data-action="calc-km"],
   .viewer .add-person, .viewer [data-action="split-all"], .viewer .chip:not(.on) { display: none !important; }
   .viewer .f-note:placeholder-shown, .viewer .gallery:not(:has(.thumb)) { display: none; }
@@ -352,6 +392,7 @@
   .viewer .person { padding-right: 12px; }
   .viewer .pl-form, .viewer #plResults { display: none !important; }
   .viewer .pl-ic { pointer-events: none; }
+  .viewer .ps-note:placeholder-shown { display: none; }
   .viewer .pl-price:placeholder-shown, .viewer .pl-note:placeholder-shown { display: none; }
   .viewer .pl-price:hover, .viewer .pl-note:hover { border-bottom-color: transparent; }
   .viewer .exp select { appearance: none; border-color: transparent; background: transparent; padding-left: 0; font-weight: 600; }
@@ -488,11 +529,13 @@
       <div class="tabs" id="tabs">
         <button data-tab="plan">🗺 Lịch trình</button>
         <button data-tab="money">💰 Chi tiêu</button>
+        <button data-tab="poses">🤳 Pose dáng</button>
       </div>
       <p class="hint" id="hint">Bấm vào một điểm rồi <b>Ctrl+V</b> để dán ảnh (hoặc kéo thả ảnh vào). Kéo <b>⋮⋮</b> để đổi thứ tự điểm, kể cả sang ngày khác, hoặc kéo từ danh sách <b>📌 Địa điểm</b> vào lịch trình. Ô tìm vị trí nhận tên địa điểm, toạ độ, hoặc link Google Maps.</p>
     </div>
     <div id="days"></div>
     <div class="money" id="money"></div>
+    <div class="poses" id="poses"></div>
   </aside>
   <div class="resizer" id="resizer" title="Kéo để đổi độ rộng · bấm đúp để về mặc định"></div>
   <main class="mapwrap">
@@ -597,7 +640,8 @@ let state;
 let activeStopId = null;
 let pickingStopId = null;
 let mapFilter = 'all';
-let tab = location.hash === '#chi-tieu' ? 'money' : 'plan';
+const TAB_HASH = { money: '#chi-tieu', poses: '#pose' };
+let tab = Object.keys(TAB_HASH).find((k) => TAB_HASH[k] === location.hash) || 'plan';
 let needFit = false;
 const searchResults = {};
 
@@ -685,7 +729,7 @@ const applyMode = () => {
   k.title = viewer ? 'Nhập mã để chỉnh sửa' : 'Thoát chế độ chỉnh sửa trên máy này';
 };
 
-const lockInputs = () => document.querySelectorAll('#days input, #days textarea, #money input, #money select, #places input, #places textarea').forEach((el) => {
+const lockInputs = () => document.querySelectorAll('#days input, #days textarea, #money input, #money select, #places input, #places textarea, #poses input').forEach((el) => {
   if (el.type === 'time' || el.type === 'date') { el.disabled = true; el.hidden = !el.value; }
   else if (el.tagName === 'SELECT') el.disabled = true;
   else el.readOnly = true;
@@ -916,7 +960,7 @@ const renderMap = () => {
 
 const fitAll = () => {
   // Bản đồ đang ẩn thì chưa có kích thước, đợi lúc mở lại tab Lịch trình.
-  if (tab === 'money') { needFit = true; return; }
+  if (tab !== 'plan') { needFit = true; return; }
   const lls = Object.values(markers).map((m) => m.getLatLng());
   if (!lls.length) return;
   if (lls.length === 1) map.setView(lls[0], 15);
@@ -1101,7 +1145,7 @@ const addPlaceImages = async (plid, files) => {
 };
 
 // Ô "chọn ảnh" dùng chung một input file, nên nhớ ảnh sẽ vào đâu.
-let imgTarget = null; // { kind: 'stop' | 'place', id }
+let imgTarget = null; // { kind: 'stop' | 'place' | 'pose', id }
 const pickImage = (kind, id) => { imgTarget = { kind, id }; $('#fileImg').click(); };
 
 document.addEventListener('paste', (e) => {
@@ -1111,6 +1155,10 @@ document.addEventListener('paste', (e) => {
     .map((i) => i.getAsFile());
   if (!files.length) return;
   e.preventDefault();
+  if (tab === 'poses') {
+    const gid = e.target.closest?.('.ps-group')?.dataset.gid || activeGroupId;
+    return gid ? addPoseImages(gid, files) : toast('Tạo một nhóm trước rồi dán ảnh');
+  }
   const plid = e.target.closest?.('.pl-item')?.dataset.plid || (!e.target.closest?.('.stop') && lastActive === 'place' && activePlaceId);
   if (plid && state.places.some((x) => x.id === plid)) return addPlaceImages(plid, files);
   const id = e.target.closest?.('.stop')?.dataset.id || activeStopId;
@@ -1122,6 +1170,7 @@ $('#fileImg').addEventListener('change', (e) => {
   const files = [...e.target.files];
   e.target.value = '';
   if (imgTarget?.kind === 'place') addPlaceImages(imgTarget.id, files);
+  else if (imgTarget?.kind === 'pose') addPoseImages(imgTarget.id, files);
   else if (imgTarget) addImages(imgTarget.id, files);
 });
 
@@ -1814,10 +1863,13 @@ const refreshSummary = () => { $('#moneySum').innerHTML = summaryHTML(); };
 const setTab = (t) => {
   tab = t;
   document.body.classList.toggle('tab-money', t === 'money');
+  document.body.classList.toggle('tab-poses', t === 'poses');
+  document.body.classList.toggle('tab-wide', t !== 'plan');
   document.querySelectorAll('#tabs button').forEach((b) => b.classList.toggle('on', b.dataset.tab === t));
-  history.replaceState(null, '', t === 'money' ? '#chi-tieu' : location.pathname + location.search);
+  history.replaceState(null, '', TAB_HASH[t] || location.pathname + location.search);
   if (!state) return;
   if (t === 'money') return renderMoney();
+  if (t === 'poses') { renderPoses(); return loadPoses().then(renderPoses); }
   map.invalidateSize();
   if (needFit) { needFit = false; fitAll(); }
 };
@@ -2020,11 +2072,14 @@ const fetchTrip = async () => {
 };
 
 // Đưa ảnh data URL lên server rồi thay bằng id (ảnh đang hiện trên trang vẫn giữ nguyên).
+const uploadSrc = async (src) => {
+  const [head, data] = src.split(',');
+  return (await api('/api/images', { method: 'POST', body: { mime: head.slice(5).split(';')[0], data } })).id;
+};
 const uploadImages = async () => {
   for (const owner of [...state.days.flatMap((d) => d.stops), ...state.places]) {
     for (const src of owner.images.filter((x) => x.startsWith('data:'))) {
-      const [head, data] = src.split(',');
-      const { id } = await api('/api/images', { method: 'POST', body: { mime: head.slice(5).split(';')[0], data } });
+      const id = await uploadSrc(src);
       const at = owner.images.indexOf(src);
       if (at > -1) owner.images[at] = id;
     }
@@ -2186,6 +2241,247 @@ $('#resetForm').addEventListener('submit', async (e) => {
   resetDlg.close();
   resetAll();
   toast('Đã xoá hết');
+});
+
+/* ---------- Pose dáng: thư viện dùng chung cho mọi chuyến đi ---------- */
+// Lưu riêng ở /api/shared?id=poses (không nằm trong dữ liệu chuyến đi), đồng bộ giống lịch trình.
+const POSES_PATH = '/api/shared?id=poses';
+const POSES_LOCAL = 'shared:poses';
+const defaultPoses = () => ({
+  groups: [{ id: uid(), name: 'Trong nhà', poses: [] }, { id: uid(), name: 'Ngoài trời', poses: [] }],
+});
+let poses = null; // null = chưa tải
+let posesLoad = null;
+let posesError = '';
+let poseFilter = 'all';
+let activeGroupId = null;
+let poseStatus = '';
+const pSync = { version: 0, dirty: false, seq: 0, busy: false, again: false, timer: null };
+const posesEl = $('#poses');
+const findGroup = (gid) => poses?.groups.find((g) => g.id === gid);
+const setPoseStatus = (t) => {
+  poseStatus = t;
+  const el = $('#poseStatus');
+  if (el) el.textContent = t;
+};
+const persistPoses = () => store.set(POSES_LOCAL, { data: poses, version: pSync.version, dirty: pSync.dirty }).catch(console.error);
+
+const loadPoses = () => posesLoad ||= (async () => {
+  let local = null;
+  try { local = await store.get(POSES_LOCAL); } catch (e) { console.error(e); }
+  if (!local?.data?.groups) local = null;
+  let remote = null;
+  let failed = false;
+  if (API) {
+    try { remote = await api(POSES_PATH, { key: null }); }
+    catch (e) { if (e.status !== 404) { console.error(e); failed = true; } }
+  }
+  // Máy này có thay đổi chưa lên server (hoặc mất mạng) thì dùng bản trên máy.
+  if (local && (!API || (editing() && local.dirty) || failed)) {
+    poses = local.data;
+    pSync.version = local.version || 0;
+    pSync.dirty = !!local.dirty;
+  } else if (remote) {
+    poses = remote.data;
+    pSync.version = remote.version;
+  }
+  if (!poses && failed) posesError = 'Không tải được pose dáng, kiểm tra mạng rồi tải lại trang.';
+  poses ||= defaultPoses();
+  if (editing() && pSync.dirty) schedulePosesPush(300);
+  else if (editing()) setPoseStatus(failed ? '⚠ Đang offline' : remote ? 'Đã lưu ✓' : '');
+})();
+
+const savePoses = () => {
+  if (viewer) return;
+  pSync.dirty = true;
+  pSync.seq++;
+  persistPoses();
+  if (editing()) schedulePosesPush();
+};
+const schedulePosesPush = (ms = 1200) => {
+  clearTimeout(pSync.timer);
+  setPoseStatus('Đang lưu…');
+  pSync.timer = setTimeout(pushPoses, ms);
+};
+const pushPoses = async (force = false) => {
+  if (pSync.busy) { pSync.again = true; return; }
+  pSync.busy = true;
+  clearTimeout(pSync.timer);
+  const seq = pSync.seq;
+  let conflict = false;
+  let retry = false;
+  setPoseStatus('Đang lưu lên server…');
+  try {
+    for (const g of poses.groups) {
+      for (const p of g.poses) if (p.image.startsWith('data:')) p.image = await uploadSrc(p.image);
+    }
+    const r = await api(POSES_PATH, { method: 'PUT', body: { data: poses, version: pSync.version, force } });
+    pSync.version = r.version;
+    if (pSync.seq === seq) pSync.dirty = false;
+    persistPoses();
+    setPoseStatus(pSync.dirty ? 'Đang lưu…' : 'Đã lưu ✓');
+  } catch (e) {
+    console.error(e);
+    if (e.status === 409) conflict = true;
+    else if (e.status === 401) setPoseStatus('⚠ Sai mã chỉnh sửa · đã lưu trên máy');
+    else { retry = true; setPoseStatus('⚠ Chưa lên được server · đã lưu trên máy'); }
+  }
+  pSync.busy = false;
+  if (conflict) return resolvePosesConflict();
+  if (retry) { pSync.timer = setTimeout(pushPoses, 15000); return; }
+  if (pSync.again || pSync.seq !== seq) { pSync.again = false; schedulePosesPush(300); }
+};
+const resolvePosesConflict = async () => {
+  let remote = null;
+  try { remote = await api(POSES_PATH, { key: null }); }
+  catch (e) { if (e.status !== 404) { setPoseStatus('⚠ Chưa lên được server · đã lưu trên máy'); return; } }
+  if (!remote) { pSync.version = 0; return pushPoses(true); }
+  if (!confirm('Pose dáng vừa được sửa ở máy khác.\n\nOK = tải bản mới nhất về (bỏ thay đổi chưa lưu ở máy này)\nHuỷ = ghi đè lên server bằng bản ở máy này')) return pushPoses(true);
+  poses = remote.data;
+  pSync.version = remote.version;
+  pSync.dirty = false;
+  persistPoses();
+  renderPoses();
+  setPoseStatus('Đã tải bản mới nhất ✓');
+};
+
+const addPoseImages = async (gid, files) => {
+  const g = findGroup(gid);
+  const imgs = files.filter((x) => x && x.type.startsWith('image/'));
+  if (!g || !imgs.length) return;
+  for (const file of imgs) {
+    try { g.poses.push({ id: uid(), image: await compress(file), note: '' }); }
+    catch (e) { console.error(e); toast('Không đọc được 1 ảnh'); }
+  }
+  activeGroupId = gid;
+  renderPoses();
+  savePoses();
+};
+
+const poseGroupHTML = (g) => `<section class="ps-group ${g.id === activeGroupId && !viewer ? 'active' : ''}" data-gid="${g.id}">
+    <div class="ps-head">
+      <input class="ps-name" value="${esc(g.name)}" placeholder="Tên nhóm">
+      <small>${g.poses.length} pose</small>
+      <button class="icon-btn" data-action="ps-del-group" title="Xoá nhóm">✕</button>
+    </div>
+    <div class="ps-grid">
+      ${g.poses.map((p, k) => `<figure class="pose" data-pid="${p.id}">
+        <img src="${esc(imgSrc(p.image))}" data-action="ps-view" data-i="${k}" alt="" loading="lazy">
+        <button class="x" data-action="ps-del" title="Xoá pose">✕</button>
+        <input class="ps-note" value="${esc(p.note)}" placeholder="Ghi chú…">
+      </figure>`).join('')}
+      <button class="ps-zone" data-action="ps-pick"><span>＋</span>Dán ảnh (Ctrl+V)<br>kéo thả hoặc bấm chọn</button>
+    </div>
+    ${viewer && !g.poses.length ? '<p class="hint">Chưa có pose nào.</p>' : ''}
+  </section>`;
+
+const renderPoses = () => {
+  if (!poses) { posesEl.innerHTML = '<p class="hint">Đang tải…</p>'; return; }
+  const { groups } = poses;
+  if (poseFilter !== 'all' && !findGroup(poseFilter)) poseFilter = 'all';
+  if (!findGroup(activeGroupId)) activeGroupId = poseFilter !== 'all' ? poseFilter : groups[0]?.id || null;
+  const shown = poseFilter === 'all' ? groups : groups.filter((g) => g.id === poseFilter);
+  const total = groups.reduce((n, g) => n + g.poses.length, 0);
+  posesEl.innerHTML = `<div class="ps-top">
+      <p class="hint">Thư viện pose dùng chung cho mọi chuyến đi.${viewer ? '' : ' Bấm chọn một nhóm rồi <b>Ctrl+V</b> để dán ảnh, hoặc kéo thả ảnh vào nhóm.'}</p>
+      <span class="status" id="poseStatus">${esc(poseStatus)}</span>
+    </div>
+    ${posesError ? `<p class="notice">${esc(posesError)}</p>` : ''}
+    <div class="ps-nav">
+      <button class="chip ${poseFilter === 'all' ? 'on' : ''}" data-action="ps-filter" data-g="all">Tất cả <small>${total}</small></button>
+      ${groups.map((g) => `<button class="chip ${poseFilter === g.id ? 'on' : ''}" data-action="ps-filter" data-g="${g.id}">${esc(g.name || 'Chưa đặt tên')} <small>${g.poses.length}</small></button>`).join('')}
+      <form class="ps-add" id="psAddGroup"><input id="psGroupInput" placeholder="+ Nhóm mới (Enter)" autocomplete="off"></form>
+    </div>
+    ${shown.map(poseGroupHTML).join('') || '<p class="hint">Chưa có nhóm nào.</p>'}`;
+  if (viewer) lockInputs();
+};
+
+const setActiveGroup = (gid) => {
+  if (viewer || activeGroupId === gid) return;
+  activeGroupId = gid;
+  posesEl.querySelectorAll('.ps-group').forEach((el) => el.classList.toggle('active', el.dataset.gid === gid));
+};
+posesEl.addEventListener('mousedown', (e) => {
+  const g = e.target.closest('.ps-group');
+  if (g) setActiveGroup(g.dataset.gid);
+});
+posesEl.addEventListener('focusin', (e) => {
+  const g = e.target.closest('.ps-group');
+  if (g) setActiveGroup(g.dataset.gid);
+});
+
+posesEl.addEventListener('submit', (e) => {
+  e.preventDefault();
+  if (viewer) return;
+  const name = $('#psGroupInput').value.trim();
+  if (!name) return;
+  const g = { id: uid(), name, poses: [] };
+  poses.groups.push(g);
+  activeGroupId = g.id;
+  if (poseFilter !== 'all') poseFilter = g.id;
+  renderPoses();
+  savePoses();
+  $('#psGroupInput').focus();
+});
+
+posesEl.addEventListener('click', (e) => {
+  const btn = e.target.closest('[data-action]');
+  if (!btn) return;
+  const g = findGroup(btn.closest('.ps-group')?.dataset.gid);
+  const pose = g?.poses.find((x) => x.id === btn.closest('.pose')?.dataset.pid);
+  switch (btn.dataset.action) {
+    case 'ps-filter':
+      poseFilter = btn.dataset.g;
+      if (poseFilter !== 'all') activeGroupId = poseFilter;
+      renderPoses();
+      return;
+    case 'ps-view': openLb(() => findGroup(g.id)?.poses.map((x) => x.image), Number(btn.dataset.i)); return;
+  }
+  if (viewer) return;
+  switch (btn.dataset.action) {
+    case 'ps-pick': pickImage('pose', g.id); return;
+    case 'ps-del': g.poses = g.poses.filter((x) => x !== pose); break;
+    case 'ps-del-group':
+      if (g.poses.length && !confirm(`Xoá nhóm "${g.name || 'chưa đặt tên'}" cùng ${g.poses.length} pose trong đó?`)) return;
+      poses.groups = poses.groups.filter((x) => x !== g);
+      break;
+    default: return;
+  }
+  renderPoses();
+  savePoses();
+});
+
+posesEl.addEventListener('input', (e) => {
+  if (viewer) return;
+  const t = e.target;
+  const g = findGroup(t.closest('.ps-group')?.dataset.gid);
+  if (!g) return;
+  if (t.classList.contains('ps-name')) g.name = t.value;
+  else if (t.classList.contains('ps-note')) g.poses.find((x) => x.id === t.closest('.pose').dataset.pid).note = t.value;
+  else return;
+  savePoses();
+});
+// Tên nhóm còn hiện ở thanh lọc, nên vẽ lại khi gõ xong.
+posesEl.addEventListener('change', (e) => { if (e.target.classList.contains('ps-name')) renderPoses(); });
+
+posesEl.addEventListener('dragover', (e) => {
+  if (viewer || !e.dataTransfer.types.includes('Files')) return;
+  const g = e.target.closest('.ps-group');
+  if (!g) return;
+  e.preventDefault();
+  posesEl.querySelectorAll('.ps-group.drag').forEach((el) => el !== g && el.classList.remove('drag'));
+  g.classList.add('drag');
+});
+posesEl.addEventListener('dragleave', (e) => {
+  const g = e.target.closest('.ps-group');
+  if (g && !g.contains(e.relatedTarget)) g.classList.remove('drag');
+});
+posesEl.addEventListener('drop', (e) => {
+  const g = e.target.closest('.ps-group');
+  if (viewer || !g || !e.dataTransfer.files.length) return;
+  e.preventDefault();
+  g.classList.remove('drag');
+  addPoseImages(g.dataset.gid, [...e.dataTransfer.files]);
 });
 
 /* ---------- Danh sách chuyến đi ---------- */
@@ -2390,11 +2686,14 @@ $('#trips').addEventListener('click', (e) => {
   fitAll();
 
   if (viewer) {
+    if (tab === 'poses') loadPoses().then(renderPoses);
     setStatus(remote ? `Cập nhật ${fmtDate(remote.updatedAt)}` : remoteFailed ? '⚠ Không tải được từ server' : 'Chưa có lịch trình');
     if (remoteFailed) toast('Không tải được lịch trình, kiểm tra mạng rồi tải lại trang');
     return;
   }
   navigator.storage?.persist?.();
+  if (tab === 'poses') loadPoses().then(renderPoses);
+  else if (editing()) store.get(POSES_LOCAL).then((l) => l?.dirty && loadPoses()).catch(() => {});
   if (!editing()) return;
   persist();
   if (sync.dirty) schedulePush(300);

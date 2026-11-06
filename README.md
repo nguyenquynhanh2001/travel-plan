@@ -16,7 +16,7 @@ GitHub Pages (index.html, config.js)
 Vercel Functions (api/*.js, Node 22, region sin1)
         │  @neondatabase/serverless
         ▼
-Neon PostgreSQL (bảng trips, images — tự tạo ở lần gọi đầu)
+Neon PostgreSQL (bảng trips, shared, images — tự tạo ở lần gọi đầu)
 ```
 
 | API | Quyền | Mô tả |
@@ -27,6 +27,8 @@ Neon PostgreSQL (bảng trips, images — tự tạo ở lần gọi đầu)
 | `PUT /api/trip?id=main` | `X-Edit-Key` | Lưu `{ data, version }`; sai version thì trả 409 |
 | `PATCH /api/trip?id=main` | `X-Edit-Key` | Đổi tên `{ title }` |
 | `DELETE /api/trip?id=main` | `X-Edit-Key` | Xoá chuyến đi |
+| `GET /api/shared?id=poses` | ai cũng gọi được | Dữ liệu dùng chung mọi chuyến đi (thư viện pose dáng) |
+| `PUT /api/shared?id=poses` | `X-Edit-Key` | Lưu `{ data, version }`; sai version thì trả 409 |
 | `POST /api/images` | `X-Edit-Key` | Tải ảnh lên `{ mime, data(base64) }` → `{ id }` |
 | `GET /api/images/:id` | ai cũng gọi được | Trả file ảnh, cache vĩnh viễn |
 | `GET /api/auth` | `X-Edit-Key` | Kiểm tra mã chỉnh sửa và kết nối DB |

@@ -19,6 +19,12 @@ const ensureSchema = () => schemaReady ||= (async () => {
     version integer not null default 1,
     updated_at timestamptz not null default now()
   )`;
+  await sql`create table if not exists shared (
+    id text primary key,
+    data jsonb not null,
+    version integer not null default 1,
+    updated_at timestamptz not null default now()
+  )`;
   await sql`create table if not exists images (
     hash text primary key,
     mime text not null,
