@@ -221,11 +221,43 @@
   .tabs { display: flex; gap: 4px; background: var(--soft); border-radius: 10px; padding: 4px; }
   .tabs button { flex: 1; border: 0; background: transparent; border-radius: 7px; padding: 7px 10px; font-weight: 600; color: var(--muted); }
   .tabs button.on { background: var(--panel); color: var(--ink); box-shadow: 0 1px 3px rgba(0,0,0,.12); }
-  body:not(.tab-money) #money, body:not(.tab-poses) #poses,
+  body:not(.tab-money) #money, body:not(.tab-poses) #poses, body:not(.tab-budget) #budget,
   .tab-wide #days, .tab-wide #hint, .tab-wide .mapwrap { display: none; }
   .tab-wide .app { grid-template-columns: minmax(0, 1fr); }
   .tab-wide .resizer, .tab-wide #places { display: none; }
   .tab-wide .side > * { max-width: 1040px; margin-inline: auto; }
+
+  /* Dự trù chi tiêu */
+  .budget { --c: var(--accent); display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 24px; align-items: start; }
+  .bd-cat { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 10px 12px; margin-bottom: 12px; }
+  .bd-head { display: flex; align-items: center; gap: 8px; }
+  .bd-head h3 { font-size: 15px; margin: 0; }
+  .bd-head small { color: var(--muted); font-size: 12.5px; }
+  .bd-head .bd-sum { margin-left: auto; font-weight: 700; }
+  .bd-rows { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+  .bd-rows:empty { display: none; }
+  .bd-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; padding: 4px 0; border-top: 1px dashed var(--line); }
+  .bd-row:first-child { border-top: 0; }
+  .bd-title { flex: 1 1 180px; min-width: 0; border: 0; border-bottom: 1px solid transparent; background: transparent; font-weight: 600; padding: 4px 2px; }
+  .bd-title:focus { outline: none; border-bottom-color: var(--line); }
+  .bd-price, .bd-qty {
+    border: 1px solid var(--line); border-radius: 8px; padding: 4px 6px; background: var(--soft); text-align: right; font-weight: 600;
+  }
+  .bd-price { width: 110px; }
+  .bd-qty { width: 52px; }
+  .bd-price:focus, .bd-qty:focus { outline: 2px solid color-mix(in srgb, var(--accent) 35%, transparent); outline-offset: -1px; }
+  .bd-x { color: var(--muted); font-size: 12.5px; }
+  .bd-total { min-width: 100px; text-align: right; font-weight: 700; }
+  .bd-move { border: 1px solid var(--line); border-radius: 8px; padding: 3px 4px; background: var(--panel); font-size: 12.5px; color: var(--muted); max-width: 120px; }
+  .bd-add { border: 0; background: transparent; color: var(--accent); font-weight: 600; font-size: 13px; padding: 6px 0 0; }
+  .bd-add:hover { text-decoration: underline; }
+  .bd-bars { display: flex; flex-direction: column; gap: 8px; }
+  .bd-bar-row { display: grid; grid-template-columns: 1fr auto; gap: 2px 8px; font-size: 13px; }
+  .bd-bar-row b { font-weight: 600; }
+  .bd-bar { grid-column: 1 / -1; height: 6px; border-radius: 3px; background: var(--soft); overflow: hidden; }
+  .bd-bar i { display: block; height: 100%; background: var(--accent); border-radius: 3px; }
+  .bd-cmp { display: flex; flex-direction: column; gap: 4px; font-size: 13px; }
+  .bd-cmp div { display: flex; justify-content: space-between; gap: 8px; }
 
   /* Pose dáng */
   .poses { --c: var(--accent); }
@@ -393,6 +425,9 @@
   .viewer .pl-form, .viewer #plResults { display: none !important; }
   .viewer .pl-ic { pointer-events: none; }
   .viewer .ps-note:placeholder-shown { display: none; }
+  .viewer .bd-add, .viewer .bd-move { display: none; }
+  .viewer .bd-title { cursor: default; }
+  .viewer .bd-price, .viewer .bd-qty { background: transparent; border-color: transparent; }
   .viewer .pl-price:placeholder-shown, .viewer .pl-note:placeholder-shown { display: none; }
   .viewer .pl-price:hover, .viewer .pl-note:hover { border-bottom-color: transparent; }
   .viewer .exp select { appearance: none; border-color: transparent; background: transparent; padding-left: 0; font-weight: 600; }
@@ -473,13 +508,20 @@
     .gallery { grid-template-columns: repeat(3, 1fr); }
     .money { grid-template-columns: minmax(0, 1fr); }
     .m-sum { position: static; }
+    .budget .m-sum { order: -1; }
     /* Thanh tab cố định ở đáy màn hình */
     .tabs {
       position: fixed; left: 0; right: 0; bottom: 0; z-index: 1500; border-radius: 0; gap: 8px;
       padding: 8px 12px calc(8px + env(safe-area-inset-bottom, 0px));
       background: var(--panel); border-top: 1px solid var(--line); box-shadow: 0 -4px 16px rgba(0,0,0,.06);
     }
-    .tabs button { padding: 10px; border-radius: 10px; }
+    .tabs { gap: 4px; padding-left: 6px; padding-right: 6px; }
+    .tabs button { padding: 6px 2px; border-radius: 10px; font-size: 12px; }
+    .tabs button span { display: block; font-size: 18px; line-height: 1.2; }
+    .budget { grid-template-columns: minmax(0, 1fr); }
+    .bd-title { flex-basis: 100%; }
+    .bd-total { min-width: 0; margin-left: auto; }
+    .bd-move { margin-left: auto; }
     .tabs button.on { background: color-mix(in srgb, var(--accent) 12%, var(--panel)); color: var(--accent); box-shadow: none; }
     .side { padding-bottom: calc(90px + env(safe-area-inset-bottom, 0px)); }
     .toast { bottom: calc(80px + env(safe-area-inset-bottom, 0px)); }
@@ -527,14 +569,16 @@
         <span class="status" id="status"></span>
       </div>
       <div class="tabs" id="tabs">
-        <button data-tab="plan">🗺 Lịch trình</button>
-        <button data-tab="money">💰 Chi tiêu</button>
-        <button data-tab="poses">🤳 Pose dáng</button>
+        <button data-tab="plan"><span>🗺</span> Lịch trình</button>
+        <button data-tab="budget"><span>📝</span> Dự trù</button>
+        <button data-tab="money"><span>💰</span> Chi tiêu</button>
+        <button data-tab="poses"><span>🤳</span> Pose dáng</button>
       </div>
       <p class="hint" id="hint">Bấm vào một điểm rồi <b>Ctrl+V</b> để dán ảnh (hoặc kéo thả ảnh vào). Kéo <b>⋮⋮</b> để đổi thứ tự điểm, kể cả sang ngày khác, hoặc kéo từ danh sách <b>📌 Địa điểm</b> vào lịch trình. Ô tìm vị trí nhận tên địa điểm, toạ độ, hoặc link Google Maps.</p>
     </div>
     <div id="days"></div>
     <div class="money" id="money"></div>
+    <div class="budget" id="budget"></div>
     <div class="poses" id="poses"></div>
   </aside>
   <div class="resizer" id="resizer" title="Kéo để đổi độ rộng · bấm đúp để về mặc định"></div>
@@ -628,11 +672,12 @@ const defaultState = () => ({
   distances: {},
   people: [],
   expenses: [],
+  budget: [],
   places: [],
 });
 // Dữ liệu cũ (trước khi có khoảng cách / chi tiêu) thiếu các trường này.
 const normalize = (s) => ({
-  ...s, distances: s.distances || {}, people: s.people || [], expenses: s.expenses || [],
+  ...s, distances: s.distances || {}, people: s.people || [], expenses: s.expenses || [], budget: s.budget || [],
   places: (s.places || []).map((p) => ({ images: [], ...p })),
 });
 
@@ -640,7 +685,7 @@ let state;
 let activeStopId = null;
 let pickingStopId = null;
 let mapFilter = 'all';
-const TAB_HASH = { money: '#chi-tieu', poses: '#pose' };
+const TAB_HASH = { budget: '#du-tru', money: '#chi-tieu', poses: '#pose' };
 let tab = Object.keys(TAB_HASH).find((k) => TAB_HASH[k] === location.hash) || 'plan';
 let needFit = false;
 const searchResults = {};
@@ -729,7 +774,7 @@ const applyMode = () => {
   k.title = viewer ? 'Nhập mã để chỉnh sửa' : 'Thoát chế độ chỉnh sửa trên máy này';
 };
 
-const lockInputs = () => document.querySelectorAll('#days input, #days textarea, #money input, #money select, #places input, #places textarea, #poses input').forEach((el) => {
+const lockInputs = () => document.querySelectorAll('#days input, #days textarea, #money input, #money select, #places input, #places textarea, #poses input, #budget input, #budget select').forEach((el) => {
   if (el.type === 'time' || el.type === 'date') { el.disabled = true; el.hidden = !el.value; }
   else if (el.tagName === 'SELECT') el.disabled = true;
   else el.readOnly = true;
@@ -878,6 +923,7 @@ const render = () => {
   $('#tripTitle').value = state.title;
   $('#days').innerHTML = state.days.map(dayHTML).join('');
   renderMoney();
+  renderBudget();
   renderPlaces();
   if (viewer) lockInputs();
   renderMapCtrl();
@@ -1864,11 +1910,13 @@ const setTab = (t) => {
   tab = t;
   document.body.classList.toggle('tab-money', t === 'money');
   document.body.classList.toggle('tab-poses', t === 'poses');
+  document.body.classList.toggle('tab-budget', t === 'budget');
   document.body.classList.toggle('tab-wide', t !== 'plan');
   document.querySelectorAll('#tabs button').forEach((b) => b.classList.toggle('on', b.dataset.tab === t));
   history.replaceState(null, '', TAB_HASH[t] || location.pathname + location.search);
   if (!state) return;
   if (t === 'money') return renderMoney();
+  if (t === 'budget') return renderBudget();
   if (t === 'poses') { renderPoses(); return loadPoses().then(renderPoses); }
   map.invalidateSize();
   if (needFit) { needFit = false; fitAll(); }
@@ -1878,6 +1926,126 @@ $('#tabs').addEventListener('click', (e) => {
   if (b && b.dataset.tab !== tab) setTab(b.dataset.tab);
 });
 setTab(tab);
+
+/* ---------- Dự trù chi tiêu ---------- */
+const BUDGET_CATS = {
+  food: { icon: '🍜', label: 'Ăn uống' },
+  ticket: { icon: '🎟', label: 'Vé tham quan' },
+  transport: { icon: '🚗', label: 'Đi lại' },
+  stay: { icon: '🏠', label: 'Lưu trú' },
+  shopping: { icon: '🛍', label: 'Mua sắm, quà' },
+  other: { icon: '📦', label: 'Khác' },
+};
+const catOf = (b) => (BUDGET_CATS[b.cat] ? b.cat : 'other');
+const lineTotal = (b) => (b.price || 0) * (b.qty || 0);
+const sumOf = (list) => list.reduce((acc, b) => acc + lineTotal(b), 0);
+// "2", "1,5" → số; trống/sai → 0.
+const parseQty = (v) => { const n = parseFloat(String(v).replace(',', '.')); return Number.isFinite(n) && n > 0 ? n : 0; };
+const budgetEl = $('#budget');
+
+const budgetRowHTML = (b) => `<div class="bd-row" data-bid="${b.id}">
+    <input class="bd-title" value="${esc(b.title)}" placeholder="Khoản chi (vd: Vé cáp treo)">
+    <input class="bd-price" inputmode="decimal" value="${b.price ? nf.format(b.price) : ''}" placeholder="Đơn giá" title="Đơn giá (150k, 1,2tr…)">
+    <span class="bd-x">×</span>
+    <input class="bd-qty" inputmode="decimal" value="${esc(b.qty ?? '')}" placeholder="SL" title="Số lượng (người, vé, đêm…)">
+    <span class="bd-total">${lineTotal(b) ? fmtMoney(lineTotal(b)) : ''}</span>
+    <select class="bd-move" title="Chuyển sang loại khác">${Object.entries(BUDGET_CATS).map(([k, c]) => `<option value="${k}" ${k === catOf(b) ? 'selected' : ''}>${c.icon} ${c.label}</option>`).join('')}</select>
+    <button class="icon-btn" data-action="bd-del" title="Xoá khoản này">✕</button>
+  </div>`;
+
+const budgetSummaryHTML = () => {
+  const total = sumOf(state.budget);
+  const people = state.people.length;
+  const spent = state.expenses.reduce((acc, x) => acc + (x.amount || 0), 0);
+  const cats = Object.entries(BUDGET_CATS)
+    .map(([k, c]) => ({ ...c, sum: sumOf(state.budget.filter((b) => catOf(b) === k)) }))
+    .filter((c) => c.sum);
+  const left = total - spent;
+  return `<div>
+      <div class="m-label">Tổng dự trù</div>
+      <div class="m-total">${fmtMoney(total)}</div>
+      ${people && total ? `<div class="hint">≈ ${fmtMoney(total / people)}/người · ${people} người (theo tab Chi tiêu)</div>` : ''}
+    </div>
+    ${cats.length ? `<div>
+      <div class="m-label">Theo loại</div>
+      <div class="bd-bars">${cats.map((c) => `<div class="bd-bar-row">
+        <span>${c.icon} ${esc(c.label)}</span><b>${fmtMoney(c.sum)} · ${Math.round((c.sum / total) * 100)}%</b>
+        <div class="bd-bar"><i style="width:${(c.sum / total) * 100}%"></i></div>
+      </div>`).join('')}</div>
+    </div>` : ''}
+    ${total ? `<div>
+      <div class="m-label">So với thực tế</div>
+      <div class="bd-cmp">
+        <div><span>Đã chi (tab Chi tiêu)</span><b>${fmtMoney(spent)}</b></div>
+        <div><span>${left >= 0 ? 'Còn trong dự trù' : 'Vượt dự trù'}</span><b class="${left >= 0 ? 'pos' : 'neg'}">${fmtMoney(Math.abs(left))}</b></div>
+        <div class="bd-bar"><i style="width:${Math.min(100, (spent / total) * 100)}%;${left < 0 ? 'background:var(--danger)' : ''}"></i></div>
+      </div>
+    </div>` : '<p class="hint">Nhập các khoản dự kiến ở bên cạnh để xem tổng.</p>'}`;
+};
+
+const renderBudget = () => {
+  budgetEl.innerHTML = `<div>
+      ${Object.entries(BUDGET_CATS).map(([k, c]) => {
+        const items = state.budget.filter((b) => catOf(b) === k);
+        if (viewer && !items.length) return '';
+        return `<section class="bd-cat" data-cat="${k}">
+          <div class="bd-head"><h3>${c.icon} ${esc(c.label)}</h3>${items.length ? `<small>${items.length} khoản</small>` : ''}
+            <span class="bd-sum">${items.length ? fmtMoney(sumOf(items)) : ''}</span></div>
+          <div class="bd-rows">${items.map(budgetRowHTML).join('')}</div>
+          <button class="bd-add" data-action="bd-add">+ Thêm khoản</button>
+        </section>`;
+      }).join('') || '<p class="hint">Chưa có khoản dự trù nào.</p>'}
+    </div>
+    <aside class="m-sum" id="budgetSum">${budgetSummaryHTML()}</aside>`;
+  if (viewer) lockInputs();
+};
+// Đang gõ thì chỉ cập nhật số, không vẽ lại cả danh sách (giữ con trỏ trong ô).
+const refreshBudgetNumbers = (row, b) => {
+  row.querySelector('.bd-total').textContent = lineTotal(b) ? fmtMoney(lineTotal(b)) : '';
+  const sec = row.closest('.bd-cat');
+  const items = state.budget.filter((x) => catOf(x) === sec.dataset.cat);
+  sec.querySelector('.bd-sum').textContent = fmtMoney(sumOf(items));
+  $('#budgetSum').innerHTML = budgetSummaryHTML();
+};
+
+budgetEl.addEventListener('input', (e) => {
+  if (viewer) return;
+  const t = e.target;
+  const row = t.closest('.bd-row');
+  const b = state.budget.find((x) => x.id === row?.dataset.bid);
+  if (!b) return;
+  if (t.classList.contains('bd-title')) b.title = t.value;
+  else if (t.classList.contains('bd-price')) b.price = parseMoney(t.value);
+  else if (t.classList.contains('bd-qty')) b.qty = parseQty(t.value);
+  else return;
+  refreshBudgetNumbers(row, b);
+  save();
+});
+budgetEl.addEventListener('change', (e) => {
+  if (viewer) return;
+  const t = e.target;
+  const b = state.budget.find((x) => x.id === t.closest('.bd-row')?.dataset.bid);
+  if (!b) return;
+  if (t.classList.contains('bd-price')) t.value = b.price ? nf.format(b.price) : '';
+  else if (t.classList.contains('bd-move')) { b.cat = t.value; renderBudget(); save(); }
+});
+budgetEl.addEventListener('click', (e) => {
+  const btn = e.target.closest('[data-action]');
+  if (!btn || viewer) return;
+  if (btn.dataset.action === 'bd-add') {
+    const b = { id: uid(), cat: btn.closest('.bd-cat').dataset.cat, title: '', price: 0, qty: 1 };
+    state.budget.push(b);
+    renderBudget();
+    save();
+    document.querySelector(`.bd-row[data-bid="${b.id}"] .bd-title`)?.focus();
+  } else if (btn.dataset.action === 'bd-del') {
+    const b = state.budget.find((x) => x.id === btn.closest('.bd-row').dataset.bid);
+    if ((b.title || b.price) && !confirm(`Xoá khoản "${b.title || fmtMoney(lineTotal(b))}"?`)) return;
+    state.budget = state.budget.filter((x) => x !== b);
+    renderBudget();
+    save();
+  }
+});
 
 /* ---------- Xuất Excel ---------- */
 // Thư viện ~1MB nên chỉ tải khi bấm nút.
