@@ -20,6 +20,11 @@
     --accent: #0f766e;
     --day1: #e4572e;
     --day2: #2e86de;
+    --day3: #16a34a;
+    --day4: #9333ea;
+    --day5: #d97706;
+    --day6: #db2777;
+    --day7: #0891b2;
     --danger: #c0392b;
     --ok: #15803d;
     --radius: 12px;
@@ -121,7 +126,7 @@
     position: sticky; top: -20px; background: var(--bg); padding: 10px 0; z-index: 2;
   }
   .day-badge { width: 10px; height: 10px; border-radius: 50%; background: var(--c); flex: none; }
-  .day-label { font-size: 18px; font-weight: 700; border: 0; background: transparent; width: 110px; padding: 2px 0; }
+  .day-label { font-size: 18px; font-weight: 700; border: 0; background: transparent; width: 86px; padding: 2px 0; }
   .day-label:focus { outline: none; border-bottom: 1px dashed var(--muted); }
   .day-date { border: 1px solid var(--line); border-radius: 8px; padding: 4px 6px; background: var(--panel); font-size: 13px; }
   .day-dir { margin-left: auto; font-size: 12.5px; color: var(--c); text-decoration: none; font-weight: 600; }
@@ -216,6 +221,13 @@
     border-radius: var(--radius); padding: 10px; color: var(--muted); font-weight: 600;
   }
   .add:hover { border-color: var(--c); color: var(--c); }
+  .add-day {
+    width: 100%; border: 1.5px dashed var(--line); background: transparent; border-radius: var(--radius);
+    padding: 12px; color: var(--muted); font-weight: 600; font-size: 14px; margin-bottom: 20px;
+  }
+  .add-day:hover { border-color: var(--accent); color: var(--accent); }
+  .day-head .icon-btn { width: 22px; height: 22px; font-size: 12px; margin-right: -4px; }
+  .viewer .add-day { display: none; }
 
   /* Tab Lịch trình / Chi tiêu */
   .tabs { display: flex; gap: 4px; background: var(--soft); border-radius: 10px; padding: 4px; }
@@ -665,7 +677,7 @@ const $ = (s) => document.querySelector(s);
 const uid = () => Math.random().toString(36).slice(2, 10);
 const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const cssVar = (n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
-const dayColor = (i) => cssVar(i === 0 ? '--day1' : '--day2');
+const dayColor = (i) => cssVar(`--day${(i % 7) + 1}`);
 const fmtDate = (t) => new Date(t).toLocaleString('vi-VN', { dateStyle: 'short', timeStyle: 'short' });
 
 const newStop = (time = '') => ({ id: uid(), time, name: '', note: '', place: null, images: [] });
@@ -919,6 +931,7 @@ const dayHTML = (d, di) => {
       <input type="date" class="day-date" value="${esc(d.date)}">
       <span class="day-total">${dayTotalText(d)}</span>
       ${dir}
+      ${state.days.length > 1 ? '<button class="icon-btn" data-action="del-day" title="Xoá ngày này">✕</button>' : ''}
     </div>
     <div class="tl">${d.stops.map((s, i) => (i ? legHTML(d.stops[i - 1], s) : '') + stopHTML(s, i)).join('')}</div>
     <button class="add" data-action="add-stop">+ Thêm điểm</button>
@@ -927,7 +940,7 @@ const dayHTML = (d, di) => {
 
 const render = () => {
   $('#tripTitle').value = state.title;
-  $('#days').innerHTML = state.days.map(dayHTML).join('');
+  $('#days').innerHTML = state.days.map(dayHTML).join('') + '<button class="add-day" data-action="add-day">+ Thêm ngày</button>';
   renderMoney();
   renderBudget();
   renderPlaces();
@@ -1746,6 +1759,37 @@ daysEl.addEventListener('click', (e) => {
       render();
       save();
       document.querySelector(`.stop[data-id="${s.id}"] .f-name`)?.focus();
+      break;
+    }
+    case 'add-day': {
+      const last = state.days.at(-1);
+      let date = '';
+      if (last?.date) {
+        const t = new Date(`${last.date}T00:00:00Z`);
+        t.setUTCDate(t.getUTCDate() + 1);
+        date = t.toISOString().slice(0, 10);
+      }
+      const day = { id: uid(), label: `Ngày ${state.days.length + 1}`, date, stops: [] };
+      state.days.push(day);
+      render();
+      save();
+      document.querySelector(`.day[data-day="${day.id}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      break;
+    }
+    case 'del-day': {
+      const day = state.days.find((d) => d.id === btn.closest('.day').dataset.day);
+      if (!day || state.days.length < 2) return;
+      const filled = day.stops.filter((s) => s.name || s.place || s.images.length || s.note).length;
+      if (filled && !confirm(`Xoá "${day.label}" cùng ${day.stops.length} điểm trong ngày?`)) return;
+      const ids = new Set(day.stops.map((s) => s.id));
+      Object.keys(state.distances).forEach((k) => { if (k.split('>').some((x) => ids.has(x))) delete state.distances[k]; });
+      state.expenses.forEach((x) => { if (x.dayId === day.id) x.dayId = ''; });
+      state.days = state.days.filter((d) => d !== day);
+      // Tên còn là "Ngày N" mặc định thì đánh số lại cho liền mạch.
+      state.days.forEach((d, i) => { if (/^Ngày \d+$/.test(d.label)) d.label = `Ngày ${i + 1}`; });
+      mapFilter = 'all';
+      render();
+      save();
       break;
     }
     case 'del-stop': {
