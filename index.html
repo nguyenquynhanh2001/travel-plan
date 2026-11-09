@@ -247,6 +247,11 @@
   .bd-qty { width: 52px; }
   .bd-price:focus, .bd-qty:focus { outline: 2px solid color-mix(in srgb, var(--accent) 35%, transparent); outline-offset: -1px; }
   .bd-x { color: var(--muted); font-size: 12.5px; }
+  .bd-note {
+    flex-basis: 100%; min-width: 0; border: 0; border-bottom: 1px solid transparent; background: transparent;
+    font-size: 12.5px; color: var(--muted); padding: 1px 2px;
+  }
+  .bd-note:hover, .bd-note:focus { outline: none; border-bottom-color: var(--line); color: var(--ink); }
   .bd-total { min-width: 100px; text-align: right; font-weight: 700; }
   .bd-move { border: 1px solid var(--line); border-radius: 8px; padding: 3px 4px; background: var(--panel); font-size: 12.5px; color: var(--muted); max-width: 120px; }
   .bd-add { border: 0; background: transparent; color: var(--accent); font-weight: 600; font-size: 13px; padding: 6px 0 0; }
@@ -425,7 +430,8 @@
   .viewer .pl-form, .viewer #plResults { display: none !important; }
   .viewer .pl-ic { pointer-events: none; }
   .viewer .ps-note:placeholder-shown { display: none; }
-  .viewer .bd-add, .viewer .bd-move { display: none; }
+  .viewer .bd-add, .viewer .bd-move, .viewer .bd-note:placeholder-shown { display: none; }
+  .viewer .bd-note:hover { border-bottom-color: transparent; color: var(--muted); }
   .viewer .bd-title { cursor: default; }
   .viewer .bd-price, .viewer .bd-qty { background: transparent; border-color: transparent; }
   .viewer .pl-price:placeholder-shown, .viewer .pl-note:placeholder-shown { display: none; }
@@ -1951,6 +1957,7 @@ const budgetRowHTML = (b) => `<div class="bd-row" data-bid="${b.id}">
     <span class="bd-total">${lineTotal(b) ? fmtMoney(lineTotal(b)) : ''}</span>
     <select class="bd-move" title="Chuyển sang loại khác">${Object.entries(BUDGET_CATS).map(([k, c]) => `<option value="${k}" ${k === catOf(b) ? 'selected' : ''}>${c.icon} ${c.label}</option>`).join('')}</select>
     <button class="icon-btn" data-action="bd-del" title="Xoá khoản này">✕</button>
+    <input class="bd-note" value="${esc(b.note)}" placeholder="📝 Ghi chú (vd: 2 bữa sáng + 3 trưa + 2 tối)">
   </div>`;
 
 const budgetSummaryHTML = () => {
@@ -2014,6 +2021,7 @@ budgetEl.addEventListener('input', (e) => {
   const row = t.closest('.bd-row');
   const b = state.budget.find((x) => x.id === row?.dataset.bid);
   if (!b) return;
+  if (t.classList.contains('bd-note')) { b.note = t.value; return save(); }
   if (t.classList.contains('bd-title')) b.title = t.value;
   else if (t.classList.contains('bd-price')) b.price = parseMoney(t.value);
   else if (t.classList.contains('bd-qty')) b.qty = parseQty(t.value);
